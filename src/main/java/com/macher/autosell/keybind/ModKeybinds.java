@@ -1,10 +1,10 @@
 package com.macher.autosell.keybind;
 
 import com.macher.autosell.MacherAutoSellClient;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.minecraft.client.option.KeyBinding;
-import net.minecraft.client.util.InputUtil;
-import net.minecraft.util.Identifier;
+import com.mojang.blaze3d.platform.InputConstants;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
+import net.minecraft.client.KeyMapping;
+import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 /**
@@ -13,33 +13,33 @@ import org.lwjgl.glfw.GLFW;
  * {@code key.category.macher-auto-sell.main}.
  */
 public final class ModKeybinds {
-	private static final KeyBinding.Category CATEGORY =
-			KeyBinding.Category.create(Identifier.of(MacherAutoSellClient.MOD_ID, "main"));
+	private static final KeyMapping.Category CATEGORY =
+			KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MacherAutoSellClient.MOD_ID, "main"));
 
-	private static KeyBinding openSettings;
-	private static KeyBinding toggleAutoSell;
+	private static KeyMapping openSettings;
+	private static KeyMapping toggleAutoSell;
 
 	private ModKeybinds() {
 	}
 
 	public static void register() {
-		openSettings = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+		openSettings = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 				"key.macherautosell.open_settings",
-				InputUtil.Type.KEYSYM,
+				InputConstants.Type.KEYSYM,
 				GLFW.GLFW_KEY_O,
 				CATEGORY));
-		toggleAutoSell = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+		toggleAutoSell = KeyMappingHelper.registerKeyMapping(new KeyMapping(
 				"key.macherautosell.toggle_autosell",
-				InputUtil.Type.KEYSYM,
+				InputConstants.Type.KEYSYM,
 				GLFW.GLFW_KEY_K,
 				CATEGORY));
 	}
 
-	public static KeyBinding openSettings() {
+	public static KeyMapping openSettings() {
 		return openSettings;
 	}
 
-	public static KeyBinding toggleAutoSell() {
+	public static KeyMapping toggleAutoSell() {
 		return toggleAutoSell;
 	}
 }
