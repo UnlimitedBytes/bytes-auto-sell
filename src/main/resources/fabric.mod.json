@@ -1,0 +1,31 @@
+{
+	"schemaVersion": 1,
+	"id": "macher-auto-sell",
+	"version": "${version}",
+	"name": "Macher Auto Sell",
+	"description": "Automatically sells your inventory through the server's sell GUI. Configurable command, transfer method, transfer speeds and timings.",
+	"authors": [
+		"Macher"
+	],
+	"contact": {},
+	"license": "MIT",
+	"icon": "assets/macher-auto-sell/icon.png",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.macher.autosell.MacherAutoSellClient"
+		],
+		"modmenu": [
+			"com.macher.autosell.compat.ModMenuIntegration"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=0.19.0",
+		"minecraft": "1.21.11",
+		"java": ">=21",
+		"fabric-api": "*"
+	},
+	"suggests": {
+		"modmenu": "*"
+	}
+}
