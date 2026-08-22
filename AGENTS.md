@@ -151,8 +151,9 @@ The reviewer acts as a senior Minecraft/Fabric engineer with **zero tolerance**:
    instead of looping forever, and a disconnect always turns it off.
 5. **Protocol legitimacy** (see docs/PROTOCOL-AUDIT.md). All network traffic must go
    through the vanilla client methods — `sendChatCommand` (`sendCommand` on 26.x),
-   `clickSlot` (`click`), `closeHandledScreen` (`closeContainer`) — so every packet is
-   byte-identical to manual execution. Never construct, modify, or schedule raw packets.
+   `clickSlot` (`handleContainerInput` on 26.x), `closeHandledScreen` (`closeContainer`)
+   — so every packet is byte-identical to manual execution. Never construct, modify, or
+   schedule raw packets.
 
 ## Multi-Version Support
 
