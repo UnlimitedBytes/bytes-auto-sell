@@ -1,14 +1,34 @@
 # Macher Auto Sell
 
-A client-side Fabric mod for **Minecraft 1.21.11** that automatically sells your
-inventory through your server's sell GUI.
+A client-side Fabric mod that automatically sells your inventory through your server's
+sell GUI.
 
 > [!NOTE]
 > Automated selling may be against the rules on some servers — check before use.
 
+## Supported versions
+
+| Minecraft | Branch | Java | Fabric API | Mod Menu |
+|---|---|---|---|---|
+| 1.21.11 | `mc/1.21.11` | 21 | 0.141.6+1.21.11 | 17.0.0 |
+| 26.1 | `mc/26.1` | 25 | 0.145.1+26.1 | 18.0.0 |
+| 26.1.1 | `mc/26.1.1` | 25 | 0.145.4+26.1.1 | 18.0.0 |
+| 26.1.2 | `mc/26.1.2` | 25 | 0.155.2+26.1.2 | 18.0.0 |
+| 26.2 | `mc/26.2` | 25 | 0.158.0+26.2 | 20.0.1 |
+
+Each version lives on its own `mc/<version>` branch (see AGENTS.md). Artifact versions
+carry the Minecraft version as a suffix (e.g. `1.0.0+mc26.2`).
+
+## Protocol legitimacy
+
+Every network interaction is performed through the vanilla client methods and is
+byte-identical on the wire to a player executing the same action manually — see
+[docs/PROTOCOL-AUDIT.md](docs/PROTOCOL-AUDIT.md). Only packet *timing* can differ from
+human input; use the transfer speed/burst/randomize settings for a human-like cadence.
+
 ## Requirements
 
-- Minecraft 1.21.11 (Java 21+)
+- A supported Minecraft version (see table above) with its Java runtime
 - [Fabric Loader](https://fabricmc.net/use/) and [Fabric API](https://modrinth.com/mod/fabric-api)
 - Optional: [Mod Menu](https://modrinth.com/mod/modmenu) — adds a config button for this mod
 
