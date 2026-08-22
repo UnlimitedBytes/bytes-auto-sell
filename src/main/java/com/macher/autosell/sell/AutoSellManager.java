@@ -5,14 +5,13 @@ import com.macher.autosell.config.SellMode;
 import com.macher.autosell.config.TransferMethod;
 import com.macher.autosell.util.CommandUtil;
 import com.macher.autosell.util.TitleMatcher;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.screen.ingame.HandledScreen;
-import net.minecraft.screen.GenericContainerScreenHandler;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.SlotActionType;
-import net.minecraft.text.Text;
-
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.inventory.ContainerInput;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -51,6 +50,9 @@ import java.util.Set;
  *   <li>Any abnormal condition (GUI replaced, timeout, disconnect) resets to IDLE,
  *       and a disconnect always turns auto-sell off — it never resumes on its own.</li>
  * </ol>
+ *
+ * Protocol legitimacy (docs/PROTOCOL-AUDIT.md): the only network traffic is caused
+ * by the vanilla methods sendCommand, click and closeContainer.
  */
 public final class AutoSellManager {
 	private static final AutoSellManager INSTANCE = new AutoSellManager();
@@ -104,10 +106,10 @@ public final class AutoSellManager {
 	private int buttonFailures;
 	/** Set when a sell-button click is issued; observed (and cleared) once the grace window expires. */
 	private boolean buttonClickPending;
-	/** Countdown after a button click during which a loaded cursor is not yet trusted. */
-	private int buttonGraceTicks;
 	/** Whether the current WAIT period observed a failed button click. */
 	private boolean buttonFailedThisWait;
+	/** Countdown after a button click during which a loaded cursor is not yet trusted. */
+	private int buttonGraceTicks;
 	/** Consecutive ticks spent trying to return a loaded cursor stack. */
 	private int cursorReturnTicks;
 	private boolean buttonRemapNotified;
@@ -120,13 +122,13 @@ public final class AutoSellManager {
 		return enabled;
 	}
 
-	public void toggle(MinecraftClient client) {
+	public void toggle(Minecraft client) {
 		enabled = !enabled;
 		resetState();
 		if (client.player != null) {
-			client.player.sendMessage(Text.translatable(enabled
+			client.player.sendOverlayMessage(Component.translatable(enabled
 					? "macherautosell.msg.enabled"
-					: "macherautosell.msg.disabled"), true);
+					: "macherautosell.msg.disabled"));
 		}
 		if (enabled) {
 			// poll immediately on the next tick instead of waiting a full interval
@@ -140,8 +142,8 @@ public final class AutoSellManager {
 		resetState();
 	}
 
-	public void tick(MinecraftClient client) {
-		if (client.player == null || client.interactionManager == null) {
+	public void tick(Minecraft client) {
+		if (client.player == null || client.gameMode == null) {
 			resetState();
 			return;
 		}
@@ -184,7 +186,7 @@ public final class AutoSellManager {
 		}
 	}
 
-	private void tickIdle(MinecraftClient client) {
+	private void tickIdle(Minecraft client) {
 		if (++idlePollCounter < IDLE_POLL_INTERVAL_TICKS) {
 			return;
 		}
@@ -194,10 +196,10 @@ public final class AutoSellManager {
 		}
 	}
 
-	private void startCycle(MinecraftClient client) {
+	private void startCycle(Minecraft client) {
 		// Never send the sell command while the player has a screen open: the command
 		// response would be indistinguishable from it.
-		if (client.currentScreen != null) {
+		if (client.gui.screen() != null) {
 			state = State.IDLE;
 			return;
 		}
@@ -206,14 +208,14 @@ public final class AutoSellManager {
 			startFailure(client, "macherautosell.msg.empty_command");
 			return;
 		}
-		screenAtCommand = client.currentScreen;
-		client.player.networkHandler.sendChatCommand(command);
+		screenAtCommand = client.gui.screen();
+		client.player.connection.sendCommand(command);
 		state = State.OPENING;
 		timer = OPEN_GUI_TIMEOUT_TICKS;
 	}
 
-	private void tickOpening(MinecraftClient client) {
-		Screen screen = client.currentScreen;
+	private void tickOpening(Minecraft client) {
+		Screen screen = client.gui.screen();
 		// Only accept a screen that appeared promptly after the command was sent; a
 		// GUI appearing late (or one the player had already opened) is not accepted
 		// as the command response.
@@ -228,12 +230,12 @@ public final class AutoSellManager {
 		}
 	}
 
-	private void startFailure(MinecraftClient client, String messageKey) {
+	private void startFailure(Minecraft client, String messageKey) {
 		if (++startFailures >= MAX_START_FAILURES) {
-			disableWithFeedback(client, Text.translatable("macherautosell.msg.disabled_failures"));
+			disableWithFeedback(client, Component.translatable("macherautosell.msg.disabled_failures"));
 			return;
 		}
-		feedback(client, Text.translatable(messageKey));
+		feedback(client, Component.translatable(messageKey));
 		state = State.COOLDOWN;
 		timer = RETRY_COOLDOWN_TICKS;
 	}
@@ -250,31 +252,31 @@ public final class AutoSellManager {
 		state = State.TRANSFERRING;
 	}
 
-	private void tickTransferring(MinecraftClient client) {
-		if (!isSellGui(client.currentScreen)) {
+	private void tickTransferring(Minecraft client) {
+		if (!isSellGui(client.gui.screen())) {
 			// The GUI was closed or replaced — never touch anything else.
 			resetState();
 			return;
 		}
-		GenericContainerScreenHandler handler = sellGuiHandler(client);
-		int containerSlots = handler.slots.size() - PLAYER_SLOTS;
+		ChestMenu menu = sellGuiMenu(client);
+		int containerSlots = menu.slots.size() - PLAYER_SLOTS;
 
-		if (!handler.getCursorStack().isEmpty()) {
+		if (!menu.getCarried().isEmpty()) {
 			if (++cursorReturnTicks > MAX_CURSOR_RETURN_TICKS) {
-				disableWithFeedback(client, Text.translatable("macherautosell.msg.cursor_stuck"));
+				disableWithFeedback(client, Component.translatable("macherautosell.msg.cursor_stuck"));
 				return;
 			}
 			if (shouldRetryReturn()) {
-				returnCursorStack(client, handler);
+				returnCursorStack(client, menu);
 			}
 			return;
 		}
 		cursorReturnTicks = 0;
 
-		int items = countPlayerItems(handler, containerSlots);
+		int items = countPlayerItems(menu, containerSlots);
 		if (items == 0) {
 			// Everything movable has been deposited: trigger the sell.
-			finishDeposit(client, handler, false);
+			finishDeposit(client, menu, false);
 			return;
 		}
 
@@ -285,7 +287,7 @@ public final class AutoSellManager {
 		} else if (items == lastPlayerItemCount) {
 			if (++stallCounter >= stallLimitTicks()) {
 				// No progress for a while (sell GUI likely full): trigger the sell anyway.
-				finishDeposit(client, handler, true);
+				finishDeposit(client, menu, true);
 				return;
 			}
 		} else {
@@ -298,7 +300,7 @@ public final class AutoSellManager {
 			return;
 		}
 		transferCountdown = scheduler.nextDelayTicks(config.getTransferDelayTicks(), config.isRandomizeTransferDelay());
-		transferBurst(client, handler, containerSlots);
+		transferBurst(client, menu, containerSlots);
 	}
 
 	/**
@@ -316,7 +318,7 @@ public final class AutoSellManager {
 		return cursorReturnTicks % CURSOR_RETURN_RETRY_TICKS == 1;
 	}
 
-	private void transferBurst(MinecraftClient client, GenericContainerScreenHandler handler, int containerSlots) {
+	private void transferBurst(Minecraft client, ChestMenu menu, int containerSlots) {
 		int burst = config.getTransferBurst();
 		// The client simulates slot clicks locally before sending the packet, so local
 		// state is normally up to date; the exclusion sets additionally guard against
@@ -325,35 +327,35 @@ public final class AutoSellManager {
 		Set<Integer> usedContainerSlots = new HashSet<>();
 		boolean shift = config.getTransferMethod() == TransferMethod.SHIFT;
 		for (int i = 0; i < burst; i++) {
-			int source = findPlayerStackSlot(handler, containerSlots, clickedPlayerSlots);
+			int source = findPlayerStackSlot(menu, containerSlots, clickedPlayerSlots);
 			if (source < 0) {
 				break; // nothing left to move
 			}
 			if (shift) {
-				click(client, handler, source, SlotActionType.QUICK_MOVE);
+				click(client, menu, source, ContainerInput.QUICK_MOVE);
 				clickedPlayerSlots.add(source);
 			} else {
-				int target = findEmptyContainerSlot(handler, containerSlots, usedContainerSlots);
+				int target = findEmptyContainerSlot(menu, containerSlots, usedContainerSlots);
 				if (target < 0) {
 					break; // sell GUI is full; stall detection will trigger the sell
 				}
-				click(client, handler, source, SlotActionType.PICKUP); // pick the stack up
-				click(client, handler, target, SlotActionType.PICKUP); // place it into the sell GUI
+				click(client, menu, source, ContainerInput.PICKUP); // pick the stack up
+				click(client, menu, target, ContainerInput.PICKUP); // place it into the sell GUI
 				clickedPlayerSlots.add(source);
 				usedContainerSlots.add(target);
 			}
 		}
 	}
 
-	private void finishDeposit(MinecraftClient client, GenericContainerScreenHandler handler, boolean stalled) {
-		int containerSlots = handler.slots.size() - PLAYER_SLOTS;
+	private void finishDeposit(Minecraft client, ChestMenu menu, boolean stalled) {
+		int containerSlots = menu.slots.size() - PLAYER_SLOTS;
 		if (stalled) {
 			// A stall-terminated cycle only counts as rejected when the inventory did
 			// not shrink at all during the whole cycle (server refuses/blacklists items).
-			int items = countPlayerItems(handler, containerSlots);
+			int items = countPlayerItems(menu, containerSlots);
 			if (cycleStartItems >= 0 && items >= cycleStartItems) {
 				if (++rejectedCycles >= MAX_REJECTED_CYCLES) {
-					disableWithFeedback(client, Text.translatable("macherautosell.msg.disabled_rejected"));
+					disableWithFeedback(client, Component.translatable("macherautosell.msg.disabled_rejected"));
 					return;
 				}
 			} else {
@@ -365,7 +367,7 @@ public final class AutoSellManager {
 
 		timer = config.getReopenDelayTicks();
 		if (config.getSellMode() == SellMode.CLOSE_GUI) {
-			client.player.closeHandledScreen();
+			client.player.closeContainer();
 			state = State.WAIT_REOPEN;
 		} else {
 			// Clamp into the container's own region: on small GUIs the configured slot
@@ -374,9 +376,9 @@ public final class AutoSellManager {
 			int slot = Math.min(configured, containerSlots - 1);
 			if (slot != configured && !buttonRemapNotified) {
 				buttonRemapNotified = true;
-				feedback(client, Text.translatable("macherautosell.msg.button_slot_clamped", configured, slot));
+				feedback(client, Component.translatable("macherautosell.msg.button_slot_clamped", configured, slot));
 			}
-			click(client, handler, slot, SlotActionType.PICKUP);
+			click(client, menu, slot, ContainerInput.PICKUP);
 			buttonClickPending = true;
 			buttonFailedThisWait = false;
 			buttonGraceTicks = BUTTON_GRACE_TICKS;
@@ -384,7 +386,7 @@ public final class AutoSellManager {
 		}
 	}
 
-	private void tickWaitReopen(MinecraftClient client) {
+	private void tickWaitReopen(Minecraft client) {
 		if (--timer > 0) {
 			return;
 		}
@@ -395,10 +397,10 @@ public final class AutoSellManager {
 		}
 	}
 
-	private void tickWaitCycle(MinecraftClient client) {
-		if (isSellGui(client.currentScreen)) {
-			GenericContainerScreenHandler handler = sellGuiHandler(client);
-			if (!handler.getCursorStack().isEmpty()) {
+	private void tickWaitCycle(Minecraft client) {
+		if (isSellGui(client.gui.screen())) {
+			ChestMenu menu = sellGuiMenu(client);
+			if (!menu.getCarried().isEmpty()) {
 				if (buttonGraceTicks > 0) {
 					// The client predicts the button click locally: on servers that
 					// cancel the click while selling, the cursor only clears after one
@@ -417,17 +419,17 @@ public final class AutoSellManager {
 					buttonFailedThisWait = true;
 				}
 				if (++cursorReturnTicks > MAX_CURSOR_RETURN_TICKS) {
-					disableWithFeedback(client, Text.translatable("macherautosell.msg.cursor_stuck"));
+					disableWithFeedback(client, Component.translatable("macherautosell.msg.cursor_stuck"));
 					return;
 				}
 				// Invariant 1: return the stack (with backoff — the server may be
 				// rejecting the clicks); this may itself disable auto-sell if there
 				// is nowhere safe to put it.
 				if (shouldRetryReturn()) {
-					returnCursorStack(client, handler);
+					returnCursorStack(client, menu);
 				}
 				if (enabled && buttonFailures >= MAX_REJECTED_CYCLES) {
-					disableWithFeedback(client, Text.translatable("macherautosell.msg.disabled_button"));
+					disableWithFeedback(client, Component.translatable("macherautosell.msg.disabled_button"));
 				}
 				// The reopen countdown stays paused on purpose while the grace window
 				// runs and while the cursor is being returned — do not reorder this
@@ -458,7 +460,7 @@ public final class AutoSellManager {
 			state = State.IDLE;
 			return;
 		}
-		if (isSellGui(client.currentScreen)) {
+		if (isSellGui(client.gui.screen())) {
 			beginTransferring();
 		} else {
 			startCycle(client);
@@ -470,25 +472,25 @@ public final class AutoSellManager {
 	 * sell GUI open; if no empty slot exists, auto-sell disables itself instead of
 	 * risking an item drop on the next close.
 	 */
-	private void returnCursorStack(MinecraftClient client, GenericContainerScreenHandler handler) {
-		int containerSlots = handler.slots.size() - PLAYER_SLOTS;
-		int target = findEmptyPlayerSlot(handler, containerSlots);
+	private void returnCursorStack(Minecraft client, ChestMenu menu) {
+		int containerSlots = menu.slots.size() - PLAYER_SLOTS;
+		int target = findEmptyPlayerSlot(menu, containerSlots);
 		if (target < 0) {
-			disableWithFeedback(client, Text.translatable("macherautosell.msg.cursor_stuck"));
+			disableWithFeedback(client, Component.translatable("macherautosell.msg.cursor_stuck"));
 			return;
 		}
-		click(client, handler, target, SlotActionType.PICKUP);
+		click(client, menu, target, ContainerInput.PICKUP);
 	}
 
-	private void disableWithFeedback(MinecraftClient client, Text message) {
+	private void disableWithFeedback(Minecraft client, Component message) {
 		enabled = false;
 		resetState();
 		feedback(client, message);
 	}
 
-	private boolean hasSellableItems(MinecraftClient client) {
+	private boolean hasSellableItems(Minecraft client) {
 		for (int i = 0; i < PLAYER_SLOTS; i++) {
-			if (!client.player.getInventory().getStack(i).isEmpty()) {
+			if (!client.player.getInventory().getItem(i).isEmpty()) {
 				return true;
 			}
 		}
@@ -496,66 +498,66 @@ public final class AutoSellManager {
 	}
 
 	private boolean isSellGui(Screen screen) {
-		if (!(screen instanceof HandledScreen<?> handled)) {
+		if (!(screen instanceof AbstractContainerScreen<?> containerScreen)) {
 			return false;
 		}
-		if (!(handled.getScreenHandler() instanceof GenericContainerScreenHandler)) {
+		if (!(containerScreen.getMenu() instanceof ChestMenu)) {
 			return false;
 		}
 		return TitleMatcher.matches(config.isGuiTitleCheckEnabled(), config.getExpectedGuiTitle(),
-				handled.getTitle().getString());
+				containerScreen.getTitle().getString());
 	}
 
-	private GenericContainerScreenHandler sellGuiHandler(MinecraftClient client) {
-		HandledScreen<?> handled = (HandledScreen<?>) client.currentScreen;
-		return (GenericContainerScreenHandler) handled.getScreenHandler();
+	private ChestMenu sellGuiMenu(Minecraft client) {
+		AbstractContainerScreen<?> containerScreen = (AbstractContainerScreen<?>) client.gui.screen();
+		return (ChestMenu) containerScreen.getMenu();
 	}
 
-	private static int countPlayerItems(GenericContainerScreenHandler handler, int containerSlots) {
+	private static int countPlayerItems(ChestMenu menu, int containerSlots) {
 		int count = 0;
 		for (int i = 0; i < PLAYER_SLOTS; i++) {
-			if (!handler.getSlot(containerSlots + i).getStack().isEmpty()) {
+			if (!menu.getSlot(containerSlots + i).getItem().isEmpty()) {
 				count++;
 			}
 		}
 		return count;
 	}
 
-	private static int findPlayerStackSlot(GenericContainerScreenHandler handler, int containerSlots, Set<Integer> exclude) {
+	private static int findPlayerStackSlot(ChestMenu menu, int containerSlots, Set<Integer> exclude) {
 		for (int i = 0; i < PLAYER_SLOTS; i++) {
 			int slot = containerSlots + i;
-			if (!exclude.contains(slot) && !handler.getSlot(slot).getStack().isEmpty()) {
+			if (!exclude.contains(slot) && !menu.getSlot(slot).getItem().isEmpty()) {
 				return slot;
 			}
 		}
 		return -1;
 	}
 
-	private static int findEmptyContainerSlot(GenericContainerScreenHandler handler, int containerSlots, Set<Integer> exclude) {
+	private static int findEmptyContainerSlot(ChestMenu menu, int containerSlots, Set<Integer> exclude) {
 		for (int i = 0; i < containerSlots; i++) {
-			if (!exclude.contains(i) && handler.getSlot(i).getStack().isEmpty()) {
+			if (!exclude.contains(i) && menu.getSlot(i).getItem().isEmpty()) {
 				return i;
 			}
 		}
 		return -1;
 	}
 
-	private static int findEmptyPlayerSlot(GenericContainerScreenHandler handler, int containerSlots) {
+	private static int findEmptyPlayerSlot(ChestMenu menu, int containerSlots) {
 		for (int i = 0; i < PLAYER_SLOTS; i++) {
-			if (handler.getSlot(containerSlots + i).getStack().isEmpty()) {
+			if (menu.getSlot(containerSlots + i).getItem().isEmpty()) {
 				return containerSlots + i;
 			}
 		}
 		return -1;
 	}
 
-	private static void click(MinecraftClient client, ScreenHandler handler, int slot, SlotActionType type) {
-		client.interactionManager.clickSlot(handler.syncId, slot, 0, type, client.player);
+	private static void click(Minecraft client, AbstractContainerMenu menu, int slot, ContainerInput type) {
+		client.gameMode.handleContainerInput(menu.containerId, slot, 0, type, client.player);
 	}
 
-	private void feedback(MinecraftClient client, Text message) {
+	private void feedback(Minecraft client, Component message) {
 		if (client.player != null) {
-			client.player.sendMessage(message, true);
+			client.player.sendOverlayMessage(message);
 		}
 	}
 }
