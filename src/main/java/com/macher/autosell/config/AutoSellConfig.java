@@ -93,6 +93,11 @@ public final class AutoSellConfig {
 			}
 		} catch (IOException e) {
 			LOGGER.error("Failed to save config", e);
+			try {
+				Files.deleteIfExists(tmp);
+			} catch (IOException cleanupError) {
+				LOGGER.warn("Failed to delete temporary config file {}", tmp, cleanupError);
+			}
 		}
 	}
 

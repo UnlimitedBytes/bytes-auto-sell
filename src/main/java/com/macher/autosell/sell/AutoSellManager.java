@@ -21,21 +21,22 @@ import java.util.Set;
  *
  * <pre>
  * IDLE --(items found)--> OPENING --(sell GUI appears)--> TRANSFERRING
- *  ^                       |          |                        |        |
- *  |                  (timeout x3    |                        |        |
- *  |                   = disable)    |                 (all moved / stalled)
- *  |                       v        v                        v        v
- *  +--> COOLDOWN <--(timeout)-- [failure budget]   WAIT_REOPEN      WAIT_CYCLE
- *  ^                                          (close mode)      (keep-open mode)
- *  |                                                  |                |
- *  +------------------(no items left)-----------------+----------------+
- *                         |                                  |
- *                         v                                  v
- *                  stay IDLE (poll)              (items + GUI gone) -> startCycle -> OPENING
+ *  ^                       |                                 |         |
+ *  |            (timeout -> COOLDOWN -> retry;           (all moved  (stalled:
+ *  |             3 consecutive timeouts = disable)        or stalled)  budget)
+ *  |                                                   sell + wait the cycle delay
+ *  |                                           CLOSE_GUI: WAIT_REOPEN  KEEP_OPEN: WAIT_CYCLE
+ *  |                                                       |             |
+ *  +------------------(no items left)----------------------+-------------+
+ *                                    (items remain)          |
+ *                                                           v
+ *                                              startCycle -> OPENING, or resume
+ *                                              TRANSFERRING if the GUI is still open
  * </pre>
  *
- * Failure budgets: three consecutive failed cycle starts (no GUI / empty command)
- * or three consecutive stall-terminated cycles without inventory progress disable
+ * Failure budgets: three consecutive failed cycle starts (no GUI / empty command),
+ * three consecutive stall-terminated cycles without inventory progress, or three
+ * consecutive button clicks that pick a stack up instead of selling, disable
  * auto-sell with a message, instead of spamming the server forever.
  *
  * Safety invariants (see AGENTS.md — never break these):
@@ -84,6 +85,9 @@ public final class AutoSellManager {
 	private int transferCountdown;
 	private int startFailures;
 	private int rejectedCycles;
+	/** Consecutive button clicks in WAIT_CYCLE that picked up a stack instead of selling. */
+	private int buttonFailures;
+	private boolean buttonRemapNotified;
 	private Screen screenAtCommand;
 
 	private AutoSellManager() {
@@ -141,6 +145,8 @@ public final class AutoSellManager {
 		transferCountdown = 0;
 		startFailures = 0;
 		rejectedCycles = 0;
+		buttonFailures = 0;
+		buttonRemapNotified = false;
 		screenAtCommand = null;
 	}
 
@@ -189,10 +195,10 @@ public final class AutoSellManager {
 
 	private void startFailure(MinecraftClient client, String messageKey) {
 		if (++startFailures >= MAX_START_FAILURES) {
-			disableWithFeedback(client, "macherautosell.msg.disabled_failures");
+			disableWithFeedback(client, Text.translatable("macherautosell.msg.disabled_failures"));
 			return;
 		}
-		feedback(client, messageKey);
+		feedback(client, Text.translatable(messageKey));
 		state = State.COOLDOWN;
 		timer = RETRY_COOLDOWN_TICKS;
 	}
@@ -296,7 +302,7 @@ public final class AutoSellManager {
 			int items = countPlayerItems(handler, containerSlots);
 			if (cycleStartItems >= 0 && items >= cycleStartItems) {
 				if (++rejectedCycles >= MAX_REJECTED_CYCLES) {
-					disableWithFeedback(client, "macherautosell.msg.disabled_rejected");
+					disableWithFeedback(client, Text.translatable("macherautosell.msg.disabled_rejected"));
 					return;
 				}
 			} else {
@@ -313,7 +319,12 @@ public final class AutoSellManager {
 		} else {
 			// Clamp into the container's own region: on small GUIs the configured slot
 			// index may fall into the player inventory or beyond the GUI entirely.
-			int slot = Math.min(config.getKeepOpenButtonSlot(), containerSlots - 1);
+			int configured = config.getKeepOpenButtonSlot();
+			int slot = Math.min(configured, containerSlots - 1);
+			if (slot != configured && !buttonRemapNotified) {
+				buttonRemapNotified = true;
+				feedback(client, Text.translatable("macherautosell.msg.button_slot_clamped", configured, slot));
+			}
 			click(client, handler, slot, SlotActionType.PICKUP);
 			state = State.WAIT_CYCLE;
 		}
@@ -334,11 +345,20 @@ public final class AutoSellManager {
 		if (isSellGui(client.currentScreen)) {
 			GenericContainerScreenHandler handler = sellGuiHandler(client);
 			if (!handler.getCursorStack().isEmpty()) {
-				// The sell-button click picked up a stack (button slot was occupied).
-				// Return it before continuing so closing can never drop it.
+				// The sell-button click picked up a stack, i.e. the configured slot did
+				// not act as a sell button. Return the stack first (invariant 1), then
+				// count the failure — a slot that never sells would otherwise juggle
+				// items between GUI and inventory forever without any budget firing.
 				returnCursorStack(client, handler);
+				if (enabled && ++buttonFailures >= MAX_REJECTED_CYCLES) {
+					disableWithFeedback(client, Text.translatable("macherautosell.msg.disabled_button"));
+					return;
+				}
+				// The reopen countdown stays paused on purpose while the cursor is
+				// being returned — do not reorder this with the timer decrement.
 				return;
 			}
+			buttonFailures = 0;
 		}
 		if (--timer > 0) {
 			return;
@@ -364,16 +384,16 @@ public final class AutoSellManager {
 		int containerSlots = handler.slots.size() - PLAYER_SLOTS;
 		int target = findEmptyPlayerSlot(handler, containerSlots);
 		if (target < 0) {
-			disableWithFeedback(client, "macherautosell.msg.cursor_stuck");
+			disableWithFeedback(client, Text.translatable("macherautosell.msg.cursor_stuck"));
 			return;
 		}
 		click(client, handler, target, SlotActionType.PICKUP);
 	}
 
-	private void disableWithFeedback(MinecraftClient client, String key) {
+	private void disableWithFeedback(MinecraftClient client, Text message) {
 		enabled = false;
 		resetState();
-		feedback(client, key);
+		feedback(client, message);
 	}
 
 	private boolean hasSellableItems(MinecraftClient client) {
@@ -443,9 +463,9 @@ public final class AutoSellManager {
 		client.interactionManager.clickSlot(handler.syncId, slot, 0, type, client.player);
 	}
 
-	private void feedback(MinecraftClient client, String key) {
+	private void feedback(MinecraftClient client, Text message) {
 		if (client.player != null) {
-			client.player.sendMessage(Text.translatable(key), true);
+			client.player.sendMessage(message, true);
 		}
 	}
 }
