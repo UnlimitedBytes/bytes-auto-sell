@@ -36,6 +36,8 @@ public final class AutoSellConfig {
 	public static final int MAX_REOPEN_DELAY_TICKS = 1200;
 	public static final int MIN_BUTTON_SLOT = 0;
 	public static final int MAX_BUTTON_SLOT = 53;
+	/** Cloth Config text fields are effectively unbounded, so the config clamps itself. */
+	public static final int MAX_TEXT_LENGTH = 256;
 
 	private static AutoSellConfig instance = new AutoSellConfig();
 
@@ -70,13 +72,6 @@ public final class AutoSellConfig {
 			}
 		}
 		instance.sanitize();
-	}
-
-	/** Returns a detached copy; used by the settings screen to implement cancel semantics. */
-	public AutoSellConfig copy() {
-		AutoSellConfig copy = new AutoSellConfig();
-		copy.copyFrom(this);
-		return copy;
 	}
 
 	public void save() {
@@ -133,6 +128,8 @@ public final class AutoSellConfig {
 		if (expectedGuiTitle == null) {
 			expectedGuiTitle = "";
 		}
+		sellCommand = truncate(sellCommand);
+		expectedGuiTitle = truncate(expectedGuiTitle);
 		transferDelayTicks = clamp(transferDelayTicks, MIN_TRANSFER_DELAY_TICKS, MAX_TRANSFER_DELAY_TICKS);
 		transferBurst = clamp(transferBurst, MIN_TRANSFER_BURST, MAX_TRANSFER_BURST);
 		reopenDelayTicks = clamp(reopenDelayTicks, MIN_REOPEN_DELAY_TICKS, MAX_REOPEN_DELAY_TICKS);
@@ -143,12 +140,16 @@ public final class AutoSellConfig {
 		return Math.max(min, Math.min(max, value));
 	}
 
+	private static String truncate(String value) {
+		return value.length() <= MAX_TEXT_LENGTH ? value : value.substring(0, MAX_TEXT_LENGTH);
+	}
+
 	public String getSellCommand() {
 		return sellCommand;
 	}
 
 	public void setSellCommand(String sellCommand) {
-		this.sellCommand = sellCommand != null ? sellCommand : DEFAULT_SELL_COMMAND;
+		this.sellCommand = sellCommand != null ? truncate(sellCommand) : DEFAULT_SELL_COMMAND;
 	}
 
 	public TransferMethod getTransferMethod() {
@@ -212,7 +213,7 @@ public final class AutoSellConfig {
 	}
 
 	public void setExpectedGuiTitle(String expectedGuiTitle) {
-		this.expectedGuiTitle = expectedGuiTitle != null ? expectedGuiTitle : "";
+		this.expectedGuiTitle = expectedGuiTitle != null ? truncate(expectedGuiTitle) : "";
 	}
 
 	public int getKeepOpenButtonSlot() {
