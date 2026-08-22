@@ -250,7 +250,7 @@ public final class AutoSellManager {
 				disableWithFeedback(client, Text.translatable("macherautosell.msg.cursor_stuck"));
 				return;
 			}
-			if (cursorReturnTicks % CURSOR_RETURN_RETRY_TICKS == 1) {
+			if (shouldRetryReturn()) {
 				returnCursorStack(client, handler);
 			}
 			return;
@@ -295,6 +295,11 @@ public final class AutoSellManager {
 	private int stallLimitTicks() {
 		int maxGap = 2 * config.getTransferDelayTicks();
 		return Math.max(MIN_TRANSFER_STALL_TICKS, 2 * maxGap + 10);
+	}
+
+	/** First return attempt immediately, then one every {@link #CURSOR_RETURN_RETRY_TICKS} loaded ticks. */
+	private boolean shouldRetryReturn() {
+		return cursorReturnTicks % CURSOR_RETURN_RETRY_TICKS == 1;
 	}
 
 	private void transferBurst(MinecraftClient client, GenericContainerScreenHandler handler, int containerSlots) {
@@ -404,7 +409,7 @@ public final class AutoSellManager {
 				// Invariant 1: return the stack (with backoff — the server may be
 				// rejecting the clicks); this may itself disable auto-sell if there
 				// is nowhere safe to put it.
-				if (cursorReturnTicks % CURSOR_RETURN_RETRY_TICKS == 1) {
+				if (shouldRetryReturn()) {
 					returnCursorStack(client, handler);
 				}
 				if (enabled && buttonFailures >= MAX_REJECTED_CYCLES) {
@@ -417,6 +422,12 @@ public final class AutoSellManager {
 			}
 		}
 		buttonGraceTicks = Math.max(0, buttonGraceTicks - 1);
+		if (buttonGraceTicks == 0) {
+			// A cursor first appearing after grace expiry cannot be the mod's click
+			// (a real pickup is loaded continuously from the click and is counted on
+			// the first grace-expired tick), so stop attributing loads to the button.
+			buttonClickPending = false;
+		}
 		cursorReturnTicks = 0;
 		if (--timer > 0) {
 			return;
