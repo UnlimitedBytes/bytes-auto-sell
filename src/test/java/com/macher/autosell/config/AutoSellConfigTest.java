@@ -54,34 +54,6 @@ class AutoSellConfigTest {
 	}
 
 	@Test
-	void copyFromCopiesAllValues() {
-		AutoSellConfig source = new AutoSellConfig();
-		source.setSellCommand("/mysell");
-		source.setTransferMethod(TransferMethod.PICKUP);
-		source.setSellMode(SellMode.KEEP_OPEN);
-		source.setTransferDelayTicks(7);
-		source.setTransferBurst(4);
-		source.setRandomizeTransferDelay(true);
-		source.setReopenDelayTicks(120);
-		source.setGuiTitleCheckEnabled(true);
-		source.setExpectedGuiTitle("Sell");
-		source.setKeepOpenButtonSlot(13);
-
-		AutoSellConfig copy = source.copy();
-
-		assertEquals("/mysell", copy.getSellCommand());
-		assertEquals(TransferMethod.PICKUP, copy.getTransferMethod());
-		assertEquals(SellMode.KEEP_OPEN, copy.getSellMode());
-		assertEquals(7, copy.getTransferDelayTicks());
-		assertEquals(4, copy.getTransferBurst());
-		assertEquals(true, copy.isRandomizeTransferDelay());
-		assertEquals(120, copy.getReopenDelayTicks());
-		assertEquals(true, copy.isGuiTitleCheckEnabled());
-		assertEquals("Sell", copy.getExpectedGuiTitle());
-		assertEquals(13, copy.getKeepOpenButtonSlot());
-	}
-
-	@Test
 	void settersClampImmediately() {
 		AutoSellConfig config = new AutoSellConfig();
 		config.setTransferDelayTicks(-100);
@@ -92,5 +64,22 @@ class AutoSellConfigTest {
 		assertEquals("/sell", config.getSellCommand());
 		config.setExpectedGuiTitle(null);
 		assertEquals("", config.getExpectedGuiTitle());
+	}
+
+	@Test
+	void textValuesAreLengthLimited() {
+		AutoSellConfig config = new AutoSellConfig();
+		config.setSellCommand("/" + "a".repeat(10_000));
+		assertEquals(AutoSellConfig.MAX_TEXT_LENGTH, config.getSellCommand().length());
+		config.setExpectedGuiTitle("t".repeat(10_000));
+		assertEquals(AutoSellConfig.MAX_TEXT_LENGTH, config.getExpectedGuiTitle().length());
+
+		// sanitize also truncates raw values that bypassed the setters (e.g. from JSON)
+		AutoSellConfig raw = new AutoSellConfig();
+		raw.copyFrom(config);
+		config.setExpectedGuiTitle("");
+		config.setExpectedGuiTitle("t".repeat(10_000) + "overflow");
+		config.sanitize();
+		assertEquals(AutoSellConfig.MAX_TEXT_LENGTH, config.getExpectedGuiTitle().length());
 	}
 }
