@@ -43,8 +43,9 @@ import java.util.Set;
  *   <li>The cursor stack is returned before any GUI close or button click, and after
  *       a button click that picked a stack up. Closing with a held stack would drop
  *       the item; if returning is impossible, auto-sell disables itself instead.</li>
- *   <li>Only generic container screens that pass the title check are ever touched,
- *       and only slots within the container's own region are used as button slots.</li>
+ *   <li>Only the exact screen instance accepted as the sell GUI is ever touched
+ *       (reference identity on top of the optional title check), and only slots
+ *       within the container's own region are used as button slots.</li>
  *   <li>Only the 36 hotbar/main inventory slots are ever moved; armor and offhand are
  *       never part of a chest screen handler anyway.</li>
  *   <li>Any abnormal condition (GUI replaced, timeout, disconnect) resets to IDLE,
@@ -114,6 +115,15 @@ public final class AutoSellManager {
 	private int cursorReturnTicks;
 	private boolean buttonRemapNotified;
 	private Screen screenAtCommand;
+	/**
+	 * The exact screen instance this mod accepted as the sell GUI (from the command
+	 * response) or kept open (Keep Open mode). Only this instance is ever interacted
+	 * with again — a container screen the player opened later is a different object
+	 * and must never be touched, even with the title check disabled. Toggling
+	 * auto-sell off/on deliberately drops this provenance (resetState clears it);
+	 * cycles then wait until the GUI is closed — fail-safe by design.
+	 */
+	private Screen keptOpenScreen;
 
 	private AutoSellManager() {
 	}
@@ -177,6 +187,7 @@ public final class AutoSellManager {
 		cursorReturnTicks = 0;
 		buttonRemapNotified = false;
 		screenAtCommand = null;
+		keptOpenScreen = null;
 	}
 
 	private void tickCooldown() {
@@ -197,8 +208,17 @@ public final class AutoSellManager {
 	}
 
 	private void startCycle(Minecraft client) {
-		// Never send the sell command while the player has a screen open: the command
-		// response would be indistinguishable from it.
+		// The exact sell GUI this mod kept open from an earlier keep-open cycle may
+		// still be open: resume it directly instead of sending the command. Identity
+		// (not isSellGui) decides — a container the player opened later is a different
+		// screen object and must never be touched. Without this resume, the open-screen
+		// guard below would deadlock idle polling until the GUI is closed manually.
+		if (keptOpenScreen != null && client.screen == keptOpenScreen) {
+			beginTransferring();
+			return;
+		}
+		// Never send the sell command while the player has any other screen open:
+		// the command response would be indistinguishable from it.
 		if (client.screen != null) {
 			state = State.IDLE;
 			return;
@@ -221,7 +241,7 @@ public final class AutoSellManager {
 		// as the command response.
 		boolean acceptWindowOpen = timer > OPEN_GUI_TIMEOUT_TICKS - OPEN_ACCEPT_WINDOW_TICKS;
 		if (acceptWindowOpen && screen != screenAtCommand && isSellGui(screen)) {
-			startFailures = 0;
+			keptOpenScreen = screen;
 			beginTransferring();
 			return;
 		}
@@ -241,6 +261,7 @@ public final class AutoSellManager {
 	}
 
 	private void beginTransferring() {
+		startFailures = 0;
 		stallCounter = 0;
 		lastPlayerItemCount = -1;
 		cycleStartItems = -1;
@@ -253,7 +274,7 @@ public final class AutoSellManager {
 	}
 
 	private void tickTransferring(Minecraft client) {
-		if (!isSellGui(client.screen)) {
+		if (client.screen != keptOpenScreen) {
 			// The GUI was closed or replaced — never touch anything else.
 			resetState();
 			return;
@@ -368,8 +389,10 @@ public final class AutoSellManager {
 		timer = config.getReopenDelayTicks();
 		if (config.getSellMode() == SellMode.CLOSE_GUI) {
 			client.player.closeContainer();
+			keptOpenScreen = null;
 			state = State.WAIT_REOPEN;
 		} else {
+			keptOpenScreen = client.screen;
 			// Clamp into the container's own region: on small GUIs the configured slot
 			// index may fall into the player inventory or beyond the GUI entirely.
 			int configured = config.getKeepOpenButtonSlot();
@@ -398,7 +421,8 @@ public final class AutoSellManager {
 	}
 
 	private void tickWaitCycle(Minecraft client) {
-		if (isSellGui(client.screen)) {
+		if (client.screen == keptOpenScreen) {
+			// Still the exact GUI this mod kept open (identity, not isSellGui).
 			ChestMenu menu = sellGuiMenu(client);
 			if (!menu.getCarried().isEmpty()) {
 				if (buttonGraceTicks > 0) {
@@ -460,7 +484,7 @@ public final class AutoSellManager {
 			state = State.IDLE;
 			return;
 		}
-		if (isSellGui(client.screen)) {
+		if (client.screen == keptOpenScreen) {
 			beginTransferring();
 		} else {
 			startCycle(client);

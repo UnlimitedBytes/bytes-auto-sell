@@ -23,7 +23,7 @@ public class MacherAutoSellClient implements ClientModInitializer {
 		AutoSellManager manager = AutoSellManager.getInstance();
 		ClientTickEvents.END_CLIENT_TICK.register(minecraft -> {
 			while (ModKeybinds.openSettings().consumeClick()) {
-				minecraft.setScreenAndShow(new AutoSellConfigScreen(minecraft.screen));
+				minecraft.setScreenAndShow(AutoSellConfigScreen.create(minecraft.screen));
 			}
 			while (ModKeybinds.toggleAutoSell().consumeClick()) {
 				manager.toggle(minecraft);
