@@ -63,6 +63,12 @@ public final class AutoSellManager {
 	private static final int PLAYER_SLOTS = 36;
 	private static final int IDLE_POLL_INTERVAL_TICKS = 20;
 	private static final int OPEN_GUI_TIMEOUT_TICKS = 100;
+	/**
+	 * A sell GUI response is only accepted within this many ticks after the command;
+	 * a container screen appearing later is presumed opened by the player and is
+	 * never treated as the sell GUI (hardening when the title check is disabled).
+	 */
+	private static final int OPEN_ACCEPT_WINDOW_TICKS = 20;
 	private static final int RETRY_COOLDOWN_TICKS = 100;
 	private static final int MIN_TRANSFER_STALL_TICKS = 30;
 	private static final int MAX_START_FAILURES = 3;
@@ -189,6 +195,12 @@ public final class AutoSellManager {
 	}
 
 	private void startCycle(MinecraftClient client) {
+		// Never send the sell command while the player has a screen open: the command
+		// response would be indistinguishable from it.
+		if (client.currentScreen != null) {
+			state = State.IDLE;
+			return;
+		}
 		String command = CommandUtil.normalize(config.getSellCommand());
 		if (command.isEmpty()) {
 			startFailure(client, "macherautosell.msg.empty_command");
@@ -202,9 +214,11 @@ public final class AutoSellManager {
 
 	private void tickOpening(MinecraftClient client) {
 		Screen screen = client.currentScreen;
-		// Only accept a screen that appeared after the command was sent; a GUI the
-		// player had already opened is not the response to our command.
-		if (screen != screenAtCommand && isSellGui(screen)) {
+		// Only accept a screen that appeared promptly after the command was sent; a
+		// GUI appearing late (or one the player had already opened) is not accepted
+		// as the command response.
+		boolean acceptWindowOpen = timer > OPEN_GUI_TIMEOUT_TICKS - OPEN_ACCEPT_WINDOW_TICKS;
+		if (acceptWindowOpen && screen != screenAtCommand && isSellGui(screen)) {
 			startFailures = 0;
 			beginTransferring();
 			return;
