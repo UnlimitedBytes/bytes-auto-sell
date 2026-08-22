@@ -67,6 +67,7 @@ public final class AutoSellManager {
 	private static final int MIN_TRANSFER_STALL_TICKS = 30;
 	private static final int MAX_START_FAILURES = 3;
 	private static final int MAX_REJECTED_CYCLES = 3;
+	private static final int MAX_CURSOR_RETURN_TICKS = 100;
 
 	private enum State {
 		IDLE, COOLDOWN, OPENING, TRANSFERRING, WAIT_REOPEN, WAIT_CYCLE
@@ -85,8 +86,14 @@ public final class AutoSellManager {
 	private int transferCountdown;
 	private int startFailures;
 	private int rejectedCycles;
-	/** Consecutive button clicks in WAIT_CYCLE that picked up a stack instead of selling. */
+	/** Consecutive button clicks that picked up a stack instead of selling. */
 	private int buttonFailures;
+	/** Set when a sell-button click is issued; observed (and cleared) on the next tick. */
+	private boolean buttonClickPending;
+	/** Whether the current WAIT period observed a failed button click. */
+	private boolean buttonFailedThisWait;
+	/** Consecutive ticks spent trying to return a loaded cursor stack. */
+	private int cursorReturnTicks;
 	private boolean buttonRemapNotified;
 	private Screen screenAtCommand;
 
@@ -146,6 +153,9 @@ public final class AutoSellManager {
 		startFailures = 0;
 		rejectedCycles = 0;
 		buttonFailures = 0;
+		buttonClickPending = false;
+		buttonFailedThisWait = false;
+		cursorReturnTicks = 0;
 		buttonRemapNotified = false;
 		screenAtCommand = null;
 	}
@@ -208,6 +218,10 @@ public final class AutoSellManager {
 		lastPlayerItemCount = -1;
 		cycleStartItems = -1;
 		transferCountdown = 0;
+		// buttonFailures deliberately persists across cycles within one run; the
+		// per-wait flags belong to the wait period that just ended.
+		buttonClickPending = false;
+		buttonFailedThisWait = false;
 		state = State.TRANSFERRING;
 	}
 
@@ -221,9 +235,14 @@ public final class AutoSellManager {
 		int containerSlots = handler.slots.size() - PLAYER_SLOTS;
 
 		if (!handler.getCursorStack().isEmpty()) {
+			if (++cursorReturnTicks > MAX_CURSOR_RETURN_TICKS) {
+				disableWithFeedback(client, Text.translatable("macherautosell.msg.cursor_stuck"));
+				return;
+			}
 			returnCursorStack(client, handler);
 			return;
 		}
+		cursorReturnTicks = 0;
 
 		int items = countPlayerItems(handler, containerSlots);
 		if (items == 0) {
@@ -326,6 +345,8 @@ public final class AutoSellManager {
 				feedback(client, Text.translatable("macherautosell.msg.button_slot_clamped", configured, slot));
 			}
 			click(client, handler, slot, SlotActionType.PICKUP);
+			buttonClickPending = true;
+			buttonFailedThisWait = false;
 			state = State.WAIT_CYCLE;
 		}
 	}
@@ -345,24 +366,41 @@ public final class AutoSellManager {
 		if (isSellGui(client.currentScreen)) {
 			GenericContainerScreenHandler handler = sellGuiHandler(client);
 			if (!handler.getCursorStack().isEmpty()) {
-				// The sell-button click picked up a stack, i.e. the configured slot did
-				// not act as a sell button. Return the stack first (invariant 1), then
-				// count the failure — a slot that never sells would otherwise juggle
-				// items between GUI and inventory forever without any budget firing.
-				returnCursorStack(client, handler);
-				if (enabled && ++buttonFailures >= MAX_REJECTED_CYCLES) {
-					disableWithFeedback(client, Text.translatable("macherautosell.msg.disabled_button"));
+				// A loaded cursor here means the sell-button click picked up a stack
+				// instead of selling. Count at most one failure per issued click
+				// (buttonClickPending), never per tick — a slot that never sells would
+				// otherwise juggle items between GUI and inventory forever.
+				if (buttonClickPending) {
+					buttonClickPending = false;
+					buttonFailures++;
+					buttonFailedThisWait = true;
+				}
+				if (++cursorReturnTicks > MAX_CURSOR_RETURN_TICKS) {
+					disableWithFeedback(client, Text.translatable("macherautosell.msg.cursor_stuck"));
 					return;
+				}
+				// Invariant 1: return the stack before anything else; this may itself
+				// disable auto-sell if there is nowhere safe to put it.
+				returnCursorStack(client, handler);
+				if (enabled && buttonFailures >= MAX_REJECTED_CYCLES) {
+					disableWithFeedback(client, Text.translatable("macherautosell.msg.disabled_button"));
 				}
 				// The reopen countdown stays paused on purpose while the cursor is
 				// being returned — do not reorder this with the timer decrement.
 				return;
 			}
-			buttonFailures = 0;
 		}
+		cursorReturnTicks = 0;
 		if (--timer > 0) {
 			return;
 		}
+		// The wait period ended. If the button click sold cleanly (no cursor load was
+		// observed the whole wait), reset the failure counter; otherwise keep it.
+		buttonClickPending = false;
+		if (!buttonFailedThisWait) {
+			buttonFailures = 0;
+		}
+		buttonFailedThisWait = false;
 		if (!hasSellableItems(client)) {
 			// Nothing left to sell; idle polling resumes the cycle when new items appear.
 			state = State.IDLE;
