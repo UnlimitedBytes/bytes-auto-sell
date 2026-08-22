@@ -1,0 +1,38 @@
+{
+	"key.category.macher-auto-sell.main": "Macher Auto Sell",
+	"key.macherautosell.open_settings": "Open Settings",
+	"key.macherautosell.toggle_autosell": "Toggle Auto Sell",
+
+	"macherautosell.msg.enabled": "Macher Auto Sell: ON",
+	"macherautosell.msg.disabled": "Macher Auto Sell: OFF",
+	"macherautosell.msg.no_gui": "Auto Sell: the sell GUI did not open (check the sell command and GUI title)",
+	"macherautosell.msg.empty_command": "Auto Sell: the sell command is empty",
+	"macherautosell.msg.cursor_stuck": "Auto Sell stopped: an item on the cursor could not be returned safely",
+
+	"macherautosell.on": "ON",
+	"macherautosell.off": "OFF",
+
+	"macherautosell.config.title": "Macher Auto Sell Settings",
+	"macherautosell.config.done": "Done",
+	"macherautosell.config.cancel": "Cancel",
+	"macherautosell.config.tab.selling": "Selling",
+	"macherautosell.config.tab.timing": "Timing",
+	"macherautosell.config.tab.guicheck": "GUI Check",
+
+	"macherautosell.config.autosell": "Auto Sell: %s",
+	"macherautosell.config.sell_command": "Sell Command (e.g. /sell)",
+	"macherautosell.config.sell_mode": "Sell Mode: %s",
+	"macherautosell.config.transfer_method": "Transfer Method: %s",
+	"macherautosell.config.button_slot": "Keep-Open Button Slot: %d",
+	"macherautosell.config.transfer_delay": "Item Transfer Speed (ticks, lower = faster): %d",
+	"macherautosell.config.transfer_burst": "Transfer Burst (stacks per tick): %d",
+	"macherautosell.config.reopen_delay": "Reopen Delay (ticks): %d",
+	"macherautosell.config.randomize": "Randomize Transfer Delay: %s",
+	"macherautosell.config.title_check": "GUI Title Check: %s",
+	"macherautosell.config.expected_title": "Expected GUI Title (exact match)",
+
+	"macherautosell.sell_mode.close_gui": "Close GUI",
+	"macherautosell.sell_mode.keep_open": "Keep Open",
+	"macherautosell.transfer_method.shift": "SHIFT",
+	"macherautosell.transfer_method.pickup": "PICKUP"
+}
