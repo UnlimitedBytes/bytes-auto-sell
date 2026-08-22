@@ -44,8 +44,9 @@ import java.util.Set;
  *   <li>The cursor stack is returned before any GUI close or button click, and after
  *       a button click that picked a stack up. Closing with a held stack would drop
  *       the item; if returning is impossible, auto-sell disables itself instead.</li>
- *   <li>Only generic container screens that pass the title check are ever touched,
- *       and only slots within the container's own region are used as button slots.</li>
+ *   <li>Only the exact screen instance accepted as the sell GUI is ever touched
+ *       (reference identity on top of the optional title check), and only slots
+ *       within the container's own region are used as button slots.</li>
  *   <li>Only the 36 hotbar/main inventory slots are ever moved; armor and offhand are
  *       never part of a chest screen handler anyway.</li>
  *   <li>Any abnormal condition (GUI replaced, timeout, disconnect) resets to IDLE,
@@ -116,7 +117,9 @@ public final class AutoSellManager {
 	 * The exact screen instance this mod accepted as the sell GUI (from the command
 	 * response) or kept open (Keep Open mode). Only this instance is ever interacted
 	 * with again — a container screen the player opened later is a different object
-	 * and must never be touched, even with the title check disabled.
+	 * and must never be touched, even with the title check disabled. Toggling
+	 * auto-sell off/on deliberately drops this provenance (resetState clears it);
+	 * cycles then wait until the GUI is closed — fail-safe by design.
 	 */
 	private Screen keptOpenScreen;
 

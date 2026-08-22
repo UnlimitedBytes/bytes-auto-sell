@@ -74,12 +74,10 @@ class AutoSellConfigTest {
 		config.setExpectedGuiTitle("t".repeat(10_000));
 		assertEquals(AutoSellConfig.MAX_TEXT_LENGTH, config.getExpectedGuiTitle().length());
 
-		// sanitize also truncates raw values that bypassed the setters (e.g. from JSON)
-		AutoSellConfig raw = new AutoSellConfig();
-		raw.copyFrom(config);
-		config.setExpectedGuiTitle("");
-		config.setExpectedGuiTitle("t".repeat(10_000) + "overflow");
-		config.sanitize();
-		assertEquals(AutoSellConfig.MAX_TEXT_LENGTH, config.getExpectedGuiTitle().length());
+		// sanitize also truncates raw values that bypassed the setters (e.g. loaded from JSON)
+		AutoSellConfig raw = fromJson("{\"sellCommand\":\"/" + "a".repeat(1000) + "\",\"expectedGuiTitle\":\"t" + "b".repeat(1000) + "\"}");
+		raw.sanitize();
+		assertEquals(AutoSellConfig.MAX_TEXT_LENGTH, raw.getSellCommand().length());
+		assertEquals(AutoSellConfig.MAX_TEXT_LENGTH, raw.getExpectedGuiTitle().length());
 	}
 }
