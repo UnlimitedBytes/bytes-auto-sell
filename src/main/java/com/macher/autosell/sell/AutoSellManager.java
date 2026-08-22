@@ -195,8 +195,16 @@ public final class AutoSellManager {
 	}
 
 	private void startCycle(MinecraftClient client) {
-		// Never send the sell command while the player has a screen open: the command
-		// response would be indistinguishable from it.
+		// The sell GUI from an earlier keep-open cycle may still be open: resume it
+		// directly instead of sending the command. Without this, the open-screen
+		// guard below would refuse to start and idle polling would deadlock until
+		// the player closes the GUI manually.
+		if (isSellGui(client.currentScreen)) {
+			beginTransferring();
+			return;
+		}
+		// Never send the sell command while the player has any other screen open:
+		// the command response would be indistinguishable from it.
 		if (client.currentScreen != null) {
 			state = State.IDLE;
 			return;
