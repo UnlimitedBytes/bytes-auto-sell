@@ -14,13 +14,13 @@ import net.minecraft.text.Text;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.function.IntConsumer;
 
 /**
  * In-game settings screen, also exposed through Mod Menu.
- * Widget values write through to the live config immediately; Done persists to disk,
- * Cancel (and Esc) reloads the last saved state.
+ * Widget values write through to the live config immediately. Done persists to disk
+ * and refreshes the snapshot; Cancel and Esc revert the live config to the snapshot
+ * (the state at open, or the last saved state).
  */
 public class AutoSellConfigScreen extends Screen {
 
@@ -48,6 +48,8 @@ public class AutoSellConfigScreen extends Screen {
 	private final Screen parent;
 	private final AutoSellConfig config = AutoSellConfig.get();
 	private final AutoSellManager manager = AutoSellManager.getInstance();
+	/** Values to restore on Cancel/Esc: the state at open, refreshed after each save. */
+	private AutoSellConfig snapshot;
 
 	private Tab tab = Tab.SELLING;
 	/** Labels drawn above text fields; rebuilt on every {@link #init()}. */
@@ -56,6 +58,7 @@ public class AutoSellConfigScreen extends Screen {
 	public AutoSellConfigScreen(Screen parent) {
 		super(Text.translatable("macherautosell.config.title"));
 		this.parent = parent;
+		this.snapshot = config.copy();
 	}
 
 	@Override
@@ -91,12 +94,11 @@ public class AutoSellConfigScreen extends Screen {
 
 		addDrawableChild(ButtonWidget.builder(Text.translatable("macherautosell.config.done"), button -> {
 			config.save();
+			snapshot = config.copy();
 			close();
 		}).dimensions(cx - 152, actionsY, 150, 20).build());
-		addDrawableChild(ButtonWidget.builder(Text.translatable("macherautosell.config.cancel"), button -> {
-			AutoSellConfig.load(); // discard unsaved changes
-			close();
-		}).dimensions(cx + 2, actionsY, 150, 20).build());
+		addDrawableChild(ButtonWidget.builder(Text.translatable("macherautosell.config.cancel"), button -> close())
+				.dimensions(cx + 2, actionsY, 150, 20).build());
 	}
 
 	private int tabContentHeight() {
@@ -132,13 +134,13 @@ public class AutoSellConfigScreen extends Screen {
 		y += ROW_HEIGHT;
 
 		addDrawableChild(new IntSliderWidget(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT,
-				"macherautosell.config.button_slot", AutoSellConfig.MIN_BUTTON_SLOT, AutoSellConfig.MAX_BUTTON_SLOT,
+				"macherautosell.config.button_slot", AutoSellConfig.MIN_BUTTON_SLOT, AutoSellConfig.MAX_BUTTON_SLOT, 1,
 				config.getKeepOpenButtonSlot(), config::setKeepOpenButtonSlot));
 	}
 
 	private void initTimingTab(int cx, int y) {
 		addDrawableChild(new IntSliderWidget(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT,
-				"macherautosell.config.transfer_delay", AutoSellConfig.MIN_TRANSFER_DELAY_TICKS, AutoSellConfig.MAX_TRANSFER_DELAY_TICKS,
+				"macherautosell.config.transfer_delay", AutoSellConfig.MIN_TRANSFER_DELAY_TICKS, AutoSellConfig.MAX_TRANSFER_DELAY_TICKS, 1,
 				config.getTransferDelayTicks(), config::setTransferDelayTicks));
 		y += ROW_HEIGHT;
 
@@ -149,12 +151,12 @@ public class AutoSellConfigScreen extends Screen {
 		y += ROW_HEIGHT;
 
 		addDrawableChild(new IntSliderWidget(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT,
-				"macherautosell.config.transfer_burst", AutoSellConfig.MIN_TRANSFER_BURST, AutoSellConfig.MAX_TRANSFER_BURST,
+				"macherautosell.config.transfer_burst", AutoSellConfig.MIN_TRANSFER_BURST, AutoSellConfig.MAX_TRANSFER_BURST, 1,
 				config.getTransferBurst(), config::setTransferBurst));
 		y += ROW_HEIGHT;
 
 		addDrawableChild(new IntSliderWidget(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT,
-				"macherautosell.config.reopen_delay", AutoSellConfig.MIN_REOPEN_DELAY_TICKS, AutoSellConfig.MAX_REOPEN_DELAY_TICKS,
+				"macherautosell.config.reopen_delay", AutoSellConfig.MIN_REOPEN_DELAY_TICKS, AutoSellConfig.MAX_REOPEN_DELAY_TICKS, 5,
 				config.getReopenDelayTicks(), config::setReopenDelayTicks));
 	}
 
@@ -197,6 +199,7 @@ public class AutoSellConfigScreen extends Screen {
 	@Override
 	public void close() {
 		if (this.client != null) {
+			config.copyFrom(snapshot); // revert unsaved changes (Done refreshed the snapshot after saving)
 			this.client.setScreen(parent);
 		}
 	}
@@ -206,35 +209,36 @@ public class AutoSellConfigScreen extends Screen {
 	}
 
 	private Text valueText(String key, Enum<?> value) {
-		final String subKey;
-		if (value instanceof SellMode mode) {
-			subKey = mode.translationKey();
-		} else if (value instanceof TransferMethod method) {
-			subKey = method.translationKey();
-		} else {
-			subKey = value.name().toLowerCase(Locale.ROOT);
-		}
+		final String subKey = switch (value) {
+			case SellMode mode -> mode.translationKey();
+			case TransferMethod method -> method.translationKey();
+			default -> throw new IllegalArgumentException("Unexpected cycling value: " + value);
+		};
 		return Text.translatable(key, Text.translatable(subKey));
 	}
 
-	/** Slider for an int config value with a translated, value-formatted message. */
+	/** Slider for an int config value with a translated, value-formatted message and step snapping. */
 	private static class IntSliderWidget extends SliderWidget {
 		private final String translationKey;
 		private final int min;
 		private final int max;
+		private final int step;
 		private final IntConsumer setter;
 
-		IntSliderWidget(int x, int y, int width, int height, String translationKey, int min, int max, int initial, IntConsumer setter) {
+		IntSliderWidget(int x, int y, int width, int height, String translationKey, int min, int max, int step, int initial, IntConsumer setter) {
 			super(x, y, width, height, Text.empty(), (clamp(initial, min, max) - min) / (double) (max - min));
 			this.translationKey = translationKey;
 			this.min = min;
 			this.max = max;
+			this.step = Math.max(1, step);
 			this.setter = setter;
 			updateMessage();
 		}
 
 		private int intValue() {
-			return (int) Math.round(min + (max - min) * this.value);
+			int raw = (int) Math.round(min + (max - min) * this.value);
+			int stepped = min + (int) Math.round((raw - min) / (double) step) * step;
+			return clamp(stepped, min, max);
 		}
 
 		@Override

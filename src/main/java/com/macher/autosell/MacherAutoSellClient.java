@@ -21,10 +21,10 @@ public class MacherAutoSellClient implements ClientModInitializer {
 
 		AutoSellManager manager = AutoSellManager.getInstance();
 		ClientTickEvents.END_CLIENT_TICK.register(client -> {
-			while (ModKeybinds.OPEN_SETTINGS.wasPressed()) {
+			while (ModKeybinds.openSettings().wasPressed()) {
 				client.setScreen(new AutoSellConfigScreen(client.currentScreen));
 			}
-			while (ModKeybinds.TOGGLE_AUTO_SELL.wasPressed()) {
+			while (ModKeybinds.toggleAutoSell().wasPressed()) {
 				manager.toggle(client);
 			}
 			manager.tick(client);

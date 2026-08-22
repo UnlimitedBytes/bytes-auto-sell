@@ -19,7 +19,8 @@ inventory through your server's sell GUI.
 | Open Settings | `O` | Opens the Macher Auto Sell settings screen |
 | Toggle Auto Sell | `K` | Enables/disables auto-selling (action bar feedback) |
 
-While enabled, the mod polls your inventory. When it contains items it:
+While enabled, the mod polls your inventory (the toggle turns itself off whenever you
+leave a server — re-enable it with `K` after joining). When it contains items it:
 
 1. Runs the configured sell command (default `/sell`) — the server opens its sell GUI.
 2. Moves all hotbar + main inventory stacks (never armor/offhand) into the GUI using

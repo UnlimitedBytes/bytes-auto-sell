@@ -8,8 +8,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 
 /**
  * Client configuration, persisted as JSON in the config directory.
@@ -43,9 +45,11 @@ public final class AutoSellConfig {
 	private int transferDelayTicks = DEFAULT_TRANSFER_DELAY_TICKS;
 	private int transferBurst = DEFAULT_TRANSFER_BURST;
 	private boolean randomizeTransferDelay = false;
+	/** Delay between sell cycles: GUI reopen (Close GUI mode) or next batch (Keep Open mode). */
 	private int reopenDelayTicks = DEFAULT_REOPEN_DELAY_TICKS;
 	private boolean guiTitleCheckEnabled = false;
 	private String expectedGuiTitle = "";
+	/** Sell-button slot for Keep Open mode; clamped into the GUI's container region at use. */
 	private int keepOpenButtonSlot = DEFAULT_BUTTON_SLOT;
 
 	public static AutoSellConfig get() {
@@ -59,7 +63,7 @@ public final class AutoSellConfig {
 			try {
 				AutoSellConfig read = GSON.fromJson(Files.readString(path), AutoSellConfig.class);
 				if (read != null) {
-					instance.applyFrom(read);
+					instance.copyFrom(read);
 				}
 			} catch (IOException | JsonParseException e) {
 				LOGGER.error("Failed to read config {}; falling back to defaults", path, e);
@@ -68,11 +72,25 @@ public final class AutoSellConfig {
 		instance.sanitize();
 	}
 
+	/** Returns a detached copy; used by the settings screen to implement cancel semantics. */
+	public AutoSellConfig copy() {
+		AutoSellConfig copy = new AutoSellConfig();
+		copy.copyFrom(this);
+		return copy;
+	}
+
 	public void save() {
 		sanitize();
+		Path path = configPath();
+		Path tmp = path.resolveSibling(path.getFileName() + ".tmp");
 		try {
-			Files.createDirectories(configPath().getParent());
-			Files.writeString(configPath(), GSON.toJson(this));
+			Files.createDirectories(path.getParent());
+			Files.writeString(tmp, GSON.toJson(this));
+			try {
+				Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+			} catch (AtomicMoveNotSupportedException e) {
+				Files.move(tmp, path, StandardCopyOption.REPLACE_EXISTING);
+			}
 		} catch (IOException e) {
 			LOGGER.error("Failed to save config", e);
 		}
@@ -82,7 +100,8 @@ public final class AutoSellConfig {
 		return FabricLoader.getInstance().getConfigDir().resolve("macher-auto-sell.json");
 	}
 
-	void applyFrom(AutoSellConfig other) {
+	/** Copies all field values from {@code other} into this config, without sanitizing. */
+	public void copyFrom(AutoSellConfig other) {
 		this.sellCommand = other.sellCommand;
 		this.transferMethod = other.transferMethod;
 		this.sellMode = other.sellMode;

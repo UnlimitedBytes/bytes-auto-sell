@@ -8,6 +8,8 @@
 	"macherautosell.msg.no_gui": "Auto Sell: the sell GUI did not open (check the sell command and GUI title)",
 	"macherautosell.msg.empty_command": "Auto Sell: the sell command is empty",
 	"macherautosell.msg.cursor_stuck": "Auto Sell stopped: an item on the cursor could not be returned safely",
+	"macherautosell.msg.disabled_failures": "Auto Sell disabled: the sell GUI did not open repeatedly (check the sell command and GUI title)",
+	"macherautosell.msg.disabled_rejected": "Auto Sell disabled: the sell GUI did not accept any items (full or items not sellable)",
 
 	"macherautosell.on": "ON",
 	"macherautosell.off": "OFF",

@@ -21,21 +21,34 @@ import java.util.Set;
  *
  * <pre>
  * IDLE --(items found)--> OPENING --(sell GUI appears)--> TRANSFERRING
- *   ^                        |                              |        |
- *   |                     (timeout)                   (all moved / stalled)
- *   +--> COOLDOWN <--------+                              |        |
- *   |                                                     v        v
- *   +------------------- WAIT_REOPEN (close mode) / WAIT_CYCLE (keep-open mode)
+ *  ^                       |          |                        |        |
+ *  |                  (timeout x3    |                        |        |
+ *  |                   = disable)    |                 (all moved / stalled)
+ *  |                       v        v                        v        v
+ *  +--> COOLDOWN <--(timeout)-- [failure budget]   WAIT_REOPEN      WAIT_CYCLE
+ *  ^                                          (close mode)      (keep-open mode)
+ *  |                                                  |                |
+ *  +------------------(no items left)-----------------+----------------+
+ *                         |                                  |
+ *                         v                                  v
+ *                  stay IDLE (poll)              (items + GUI gone) -> startCycle -> OPENING
  * </pre>
+ *
+ * Failure budgets: three consecutive failed cycle starts (no GUI / empty command)
+ * or three consecutive stall-terminated cycles without inventory progress disable
+ * auto-sell with a message, instead of spamming the server forever.
  *
  * Safety invariants (see AGENTS.md — never break these):
  * <ol>
- *   <li>The cursor stack is returned before any GUI close or button click
- *       (closing with a held stack would drop the item).</li>
- *   <li>Only generic container screens that pass the title check are ever touched.</li>
+ *   <li>The cursor stack is returned before any GUI close or button click, and after
+ *       a button click that picked a stack up. Closing with a held stack would drop
+ *       the item; if returning is impossible, auto-sell disables itself instead.</li>
+ *   <li>Only generic container screens that pass the title check are ever touched,
+ *       and only slots within the container's own region are used as button slots.</li>
  *   <li>Only the 36 hotbar/main inventory slots are ever moved; armor and offhand are
  *       never part of a chest screen handler anyway.</li>
- *   <li>Any abnormal condition (GUI replaced, timeout, disconnect) resets to IDLE.</li>
+ *   <li>Any abnormal condition (GUI replaced, timeout, disconnect) resets to IDLE,
+ *       and a disconnect always turns auto-sell off — it never resumes on its own.</li>
  * </ol>
  */
 public final class AutoSellManager {
@@ -50,7 +63,9 @@ public final class AutoSellManager {
 	private static final int IDLE_POLL_INTERVAL_TICKS = 20;
 	private static final int OPEN_GUI_TIMEOUT_TICKS = 100;
 	private static final int RETRY_COOLDOWN_TICKS = 100;
-	private static final int TRANSFER_STALL_TICKS = 30;
+	private static final int MIN_TRANSFER_STALL_TICKS = 30;
+	private static final int MAX_START_FAILURES = 3;
+	private static final int MAX_REJECTED_CYCLES = 3;
 
 	private enum State {
 		IDLE, COOLDOWN, OPENING, TRANSFERRING, WAIT_REOPEN, WAIT_CYCLE
@@ -65,9 +80,10 @@ public final class AutoSellManager {
 	private int idlePollCounter;
 	private int stallCounter;
 	private int lastPlayerItemCount = -1;
+	private int cycleStartItems = -1;
 	private int transferCountdown;
-	/** Player-side handler slot a PICKUP transfer last took a stack from, for safe returns. */
-	private int pickupOriginSlot = -1;
+	private int startFailures;
+	private int rejectedCycles;
 	private Screen screenAtCommand;
 
 	private AutoSellManager() {
@@ -91,7 +107,9 @@ public final class AutoSellManager {
 		}
 	}
 
+	/** Auto-sell never survives a server change; the user re-enables it deliberately. */
 	public void onDisconnect() {
+		enabled = false;
 		resetState();
 	}
 
@@ -119,8 +137,10 @@ public final class AutoSellManager {
 		idlePollCounter = 0;
 		stallCounter = 0;
 		lastPlayerItemCount = -1;
+		cycleStartItems = -1;
 		transferCountdown = 0;
-		pickupOriginSlot = -1;
+		startFailures = 0;
+		rejectedCycles = 0;
 		screenAtCommand = null;
 	}
 
@@ -144,9 +164,7 @@ public final class AutoSellManager {
 	private void startCycle(MinecraftClient client) {
 		String command = CommandUtil.normalize(config.getSellCommand());
 		if (command.isEmpty()) {
-			feedback(client, "macherautosell.msg.empty_command");
-			state = State.COOLDOWN;
-			timer = RETRY_COOLDOWN_TICKS;
+			startFailure(client, "macherautosell.msg.empty_command");
 			return;
 		}
 		screenAtCommand = client.currentScreen;
@@ -160,21 +178,30 @@ public final class AutoSellManager {
 		// Only accept a screen that appeared after the command was sent; a GUI the
 		// player had already opened is not the response to our command.
 		if (screen != screenAtCommand && isSellGui(screen)) {
+			startFailures = 0;
 			beginTransferring();
 			return;
 		}
 		if (--timer <= 0) {
-			feedback(client, "macherautosell.msg.no_gui");
-			state = State.COOLDOWN;
-			timer = RETRY_COOLDOWN_TICKS;
+			startFailure(client, "macherautosell.msg.no_gui");
 		}
+	}
+
+	private void startFailure(MinecraftClient client, String messageKey) {
+		if (++startFailures >= MAX_START_FAILURES) {
+			disableWithFeedback(client, "macherautosell.msg.disabled_failures");
+			return;
+		}
+		feedback(client, messageKey);
+		state = State.COOLDOWN;
+		timer = RETRY_COOLDOWN_TICKS;
 	}
 
 	private void beginTransferring() {
 		stallCounter = 0;
 		lastPlayerItemCount = -1;
+		cycleStartItems = -1;
 		transferCountdown = 0;
-		pickupOriginSlot = -1;
 		state = State.TRANSFERRING;
 	}
 
@@ -188,21 +215,25 @@ public final class AutoSellManager {
 		int containerSlots = handler.slots.size() - PLAYER_SLOTS;
 
 		if (!handler.getCursorStack().isEmpty()) {
-			returnCursorStack(client, handler, containerSlots);
+			returnCursorStack(client, handler);
 			return;
 		}
 
 		int items = countPlayerItems(handler, containerSlots);
 		if (items == 0) {
 			// Everything movable has been deposited: trigger the sell.
-			finishDeposit(client, handler);
+			finishDeposit(client, handler, false);
 			return;
 		}
 
-		if (items == lastPlayerItemCount) {
-			if (++stallCounter >= TRANSFER_STALL_TICKS) {
+		if (lastPlayerItemCount < 0) {
+			// first observation of this cycle
+			lastPlayerItemCount = items;
+			cycleStartItems = items;
+		} else if (items == lastPlayerItemCount) {
+			if (++stallCounter >= stallLimitTicks()) {
 				// No progress for a while (sell GUI likely full): trigger the sell anyway.
-				finishDeposit(client, handler);
+				finishDeposit(client, handler, true);
 				return;
 			}
 		} else {
@@ -218,10 +249,21 @@ public final class AutoSellManager {
 		transferBurst(client, handler, containerSlots);
 	}
 
+	/**
+	 * Stalls are only real once they outlast the longest possible gap between bursts
+	 * (up to 2x the configured delay when randomized, see TransferScheduler) plus
+	 * headroom for the server to respond to a burst.
+	 */
+	private int stallLimitTicks() {
+		int maxGap = 2 * config.getTransferDelayTicks();
+		return Math.max(MIN_TRANSFER_STALL_TICKS, 2 * maxGap + 10);
+	}
+
 	private void transferBurst(MinecraftClient client, GenericContainerScreenHandler handler, int containerSlots) {
 		int burst = config.getTransferBurst();
-		// Local handler state updates only when the server responds, so slots already
-		// clicked in this burst are excluded instead of clicked twice.
+		// The client simulates slot clicks locally before sending the packet, so local
+		// state is normally up to date; the exclusion sets additionally guard against
+		// re-clicking slots whose local state could not be updated (e.g. server rejected).
 		Set<Integer> clickedPlayerSlots = new HashSet<>();
 		Set<Integer> usedContainerSlots = new HashSet<>();
 		boolean shift = config.getTransferMethod() == TransferMethod.SHIFT;
@@ -238,23 +280,40 @@ public final class AutoSellManager {
 				if (target < 0) {
 					break; // sell GUI is full; stall detection will trigger the sell
 				}
-				pickupOriginSlot = source;
 				click(client, handler, source, SlotActionType.PICKUP); // pick the stack up
 				click(client, handler, target, SlotActionType.PICKUP); // place it into the sell GUI
-				pickupOriginSlot = -1;
 				clickedPlayerSlots.add(source);
 				usedContainerSlots.add(target);
 			}
 		}
 	}
 
-	private void finishDeposit(MinecraftClient client, GenericContainerScreenHandler handler) {
+	private void finishDeposit(MinecraftClient client, GenericContainerScreenHandler handler, boolean stalled) {
+		int containerSlots = handler.slots.size() - PLAYER_SLOTS;
+		if (stalled) {
+			// A stall-terminated cycle only counts as rejected when the inventory did
+			// not shrink at all during the whole cycle (server refuses/blacklists items).
+			int items = countPlayerItems(handler, containerSlots);
+			if (cycleStartItems >= 0 && items >= cycleStartItems) {
+				if (++rejectedCycles >= MAX_REJECTED_CYCLES) {
+					disableWithFeedback(client, "macherautosell.msg.disabled_rejected");
+					return;
+				}
+			} else {
+				rejectedCycles = 0;
+			}
+		} else {
+			rejectedCycles = 0;
+		}
+
 		timer = config.getReopenDelayTicks();
 		if (config.getSellMode() == SellMode.CLOSE_GUI) {
 			client.player.closeHandledScreen();
 			state = State.WAIT_REOPEN;
 		} else {
-			int slot = clamp(config.getKeepOpenButtonSlot(), 0, handler.slots.size() - 1);
+			// Clamp into the container's own region: on small GUIs the configured slot
+			// index may fall into the player inventory or beyond the GUI entirely.
+			int slot = Math.min(config.getKeepOpenButtonSlot(), containerSlots - 1);
 			click(client, handler, slot, SlotActionType.PICKUP);
 			state = State.WAIT_CYCLE;
 		}
@@ -272,6 +331,15 @@ public final class AutoSellManager {
 	}
 
 	private void tickWaitCycle(MinecraftClient client) {
+		if (isSellGui(client.currentScreen)) {
+			GenericContainerScreenHandler handler = sellGuiHandler(client);
+			if (!handler.getCursorStack().isEmpty()) {
+				// The sell-button click picked up a stack (button slot was occupied).
+				// Return it before continuing so closing can never drop it.
+				returnCursorStack(client, handler);
+				return;
+			}
+		}
 		if (--timer > 0) {
 			return;
 		}
@@ -287,22 +355,25 @@ public final class AutoSellManager {
 		}
 	}
 
-	private void returnCursorStack(MinecraftClient client, GenericContainerScreenHandler handler, int containerSlots) {
-		// A stack only sits on the cursor mid-burst in PICKUP mode. Its origin slot is
-		// empty on the server (we just took the stack from it), so returning is a plain
-		// PICKUP click on that slot and cannot lose anything.
-		int origin = pickupOriginSlot >= 0 && pickupOriginSlot < handler.slots.size()
-				? pickupOriginSlot
-				: findEmptyPlayerSlot(handler, containerSlots);
-		if (origin < 0) {
-			// Nowhere safe to return the stack: stop entirely instead of risking a drop.
-			feedback(client, "macherautosell.msg.cursor_stuck");
-			enabled = false;
-			resetState();
+	/**
+	 * Places the cursor stack back into an empty player-side slot. Only called with a
+	 * sell GUI open; if no empty slot exists, auto-sell disables itself instead of
+	 * risking an item drop on the next close.
+	 */
+	private void returnCursorStack(MinecraftClient client, GenericContainerScreenHandler handler) {
+		int containerSlots = handler.slots.size() - PLAYER_SLOTS;
+		int target = findEmptyPlayerSlot(handler, containerSlots);
+		if (target < 0) {
+			disableWithFeedback(client, "macherautosell.msg.cursor_stuck");
 			return;
 		}
-		click(client, handler, origin, SlotActionType.PICKUP);
-		pickupOriginSlot = -1;
+		click(client, handler, target, SlotActionType.PICKUP);
+	}
+
+	private void disableWithFeedback(MinecraftClient client, String key) {
+		enabled = false;
+		resetState();
+		feedback(client, key);
 	}
 
 	private boolean hasSellableItems(MinecraftClient client) {
@@ -376,9 +447,5 @@ public final class AutoSellManager {
 		if (client.player != null) {
 			client.player.sendMessage(Text.translatable(key), true);
 		}
-	}
-
-	private static int clamp(int value, int min, int max) {
-		return Math.max(min, Math.min(max, value));
 	}
 }
