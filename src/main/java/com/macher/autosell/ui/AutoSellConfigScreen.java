@@ -4,14 +4,13 @@ import com.macher.autosell.config.AutoSellConfig;
 import com.macher.autosell.config.SellMode;
 import com.macher.autosell.config.TransferMethod;
 import com.macher.autosell.sell.AutoSellManager;
-import net.minecraft.client.gui.DrawContext;
-import net.minecraft.client.gui.screen.Screen;
-import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.gui.widget.CyclingButtonWidget;
-import net.minecraft.client.gui.widget.SliderWidget;
-import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.text.Text;
-
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.AbstractSliderButton;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.network.chat.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.IntConsumer;
@@ -50,13 +49,12 @@ public class AutoSellConfigScreen extends Screen {
 	private final AutoSellManager manager = AutoSellManager.getInstance();
 	/** Values to restore on Cancel/Esc: the state at open, refreshed after each save. */
 	private AutoSellConfig snapshot;
-
 	private Tab tab = Tab.SELLING;
 	/** Labels drawn above text fields; rebuilt on every {@link #init()}. */
 	private final List<LabelRow> fieldLabels = new ArrayList<>();
 
 	public AutoSellConfigScreen(Screen parent) {
-		super(Text.translatable("macherautosell.config.title"));
+		super(Component.translatable("macherautosell.config.title"));
 		this.parent = parent;
 		this.snapshot = config.copy();
 	}
@@ -78,12 +76,12 @@ public class AutoSellConfigScreen extends Screen {
 		int tabsRowWidth = tabs.length * 104 - 4;
 		for (int i = 0; i < tabs.length; i++) {
 			Tab t = tabs[i];
-			addDrawableChild(ButtonWidget.builder(Text.translatable(t.titleKey), button -> {
+			addRenderableWidget(Button.builder(Component.translatable(t.titleKey), button -> {
 				if (tab != t) {
 					tab = t;
-					clearAndInit();
+					rebuildWidgets();
 				}
-			}).dimensions(cx - tabsRowWidth / 2 + i * 104, tabsY, 100, 20).build());
+			}).bounds(cx - tabsRowWidth / 2 + i * 104, tabsY, 100, 20).build());
 		}
 
 		switch (tab) {
@@ -92,13 +90,13 @@ public class AutoSellConfigScreen extends Screen {
 			case GUI_CHECK -> initGuiCheckTab(cx, contentY);
 		}
 
-		addDrawableChild(ButtonWidget.builder(Text.translatable("macherautosell.config.done"), button -> {
+		addRenderableWidget(Button.builder(Component.translatable("macherautosell.config.done"), button -> {
 			config.save();
 			snapshot = config.copy();
-			close();
-		}).dimensions(cx - 152, actionsY, 150, 20).build());
-		addDrawableChild(ButtonWidget.builder(Text.translatable("macherautosell.config.cancel"), button -> close())
-				.dimensions(cx + 2, actionsY, 150, 20).build());
+			onClose();
+		}).bounds(cx - 152, actionsY, 150, 20).build());
+		addRenderableWidget(Button.builder(Component.translatable("macherautosell.config.cancel"), button -> onClose())
+				.bounds(cx + 2, actionsY, 150, 20).build());
 	}
 
 	private int tabContentHeight() {
@@ -110,61 +108,61 @@ public class AutoSellConfigScreen extends Screen {
 	}
 
 	private void initSellingTab(int cx, int y) {
-		addDrawableChild(ButtonWidget.builder(onOffText("macherautosell.config.autosell", manager.isEnabled()), button -> {
-			manager.toggle(this.client);
+		addRenderableWidget(Button.builder(onOffText("macherautosell.config.autosell", manager.isEnabled()), button -> {
+			manager.toggle(this.minecraft);
 			button.setMessage(onOffText("macherautosell.config.autosell", manager.isEnabled()));
-		}).dimensions(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT).build());
+		}).bounds(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT).build());
 		y += ROW_HEIGHT;
 
 		y = addLabeledTextField(cx, y, "macherautosell.config.sell_command",
 				config.getSellCommand(), config::setSellCommand);
 
-		addDrawableChild(CyclingButtonWidget.builder(
+		addRenderableWidget(CycleButton.builder(
 						(SellMode value) -> valueText("macherautosell.config.sell_mode", value), config.getSellMode())
-				.values(SellMode.values())
-				.build(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT, Text.empty(),
+				.withValues(SellMode.values())
+				.create(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT, Component.empty(),
 						(button, value) -> config.setSellMode(value)));
 		y += ROW_HEIGHT;
 
-		addDrawableChild(CyclingButtonWidget.builder(
+		addRenderableWidget(CycleButton.builder(
 						(TransferMethod value) -> valueText("macherautosell.config.transfer_method", value), config.getTransferMethod())
-				.values(TransferMethod.values())
-				.build(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT, Text.empty(),
+				.withValues(TransferMethod.values())
+				.create(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT, Component.empty(),
 						(button, value) -> config.setTransferMethod(value)));
 		y += ROW_HEIGHT;
 
-		addDrawableChild(new IntSliderWidget(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT,
+		addRenderableWidget(new IntSliderWidget(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT,
 				"macherautosell.config.button_slot", AutoSellConfig.MIN_BUTTON_SLOT, AutoSellConfig.MAX_BUTTON_SLOT, 1,
 				config.getKeepOpenButtonSlot(), config::setKeepOpenButtonSlot));
 	}
 
 	private void initTimingTab(int cx, int y) {
-		addDrawableChild(new IntSliderWidget(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT,
+		addRenderableWidget(new IntSliderWidget(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT,
 				"macherautosell.config.transfer_delay", AutoSellConfig.MIN_TRANSFER_DELAY_TICKS, AutoSellConfig.MAX_TRANSFER_DELAY_TICKS, 1,
 				config.getTransferDelayTicks(), config::setTransferDelayTicks));
 		y += ROW_HEIGHT;
 
-		addDrawableChild(ButtonWidget.builder(onOffText("macherautosell.config.randomize", config.isRandomizeTransferDelay()), button -> {
+		addRenderableWidget(Button.builder(onOffText("macherautosell.config.randomize", config.isRandomizeTransferDelay()), button -> {
 			config.setRandomizeTransferDelay(!config.isRandomizeTransferDelay());
 			button.setMessage(onOffText("macherautosell.config.randomize", config.isRandomizeTransferDelay()));
-		}).dimensions(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT).build());
+		}).bounds(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT).build());
 		y += ROW_HEIGHT;
 
-		addDrawableChild(new IntSliderWidget(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT,
+		addRenderableWidget(new IntSliderWidget(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT,
 				"macherautosell.config.transfer_burst", AutoSellConfig.MIN_TRANSFER_BURST, AutoSellConfig.MAX_TRANSFER_BURST, 1,
 				config.getTransferBurst(), config::setTransferBurst));
 		y += ROW_HEIGHT;
 
-		addDrawableChild(new IntSliderWidget(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT,
+		addRenderableWidget(new IntSliderWidget(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT,
 				"macherautosell.config.reopen_delay", AutoSellConfig.MIN_REOPEN_DELAY_TICKS, AutoSellConfig.MAX_REOPEN_DELAY_TICKS, 5,
 				config.getReopenDelayTicks(), config::setReopenDelayTicks));
 	}
 
 	private void initGuiCheckTab(int cx, int y) {
-		addDrawableChild(ButtonWidget.builder(onOffText("macherautosell.config.title_check", config.isGuiTitleCheckEnabled()), button -> {
+		addRenderableWidget(Button.builder(onOffText("macherautosell.config.title_check", config.isGuiTitleCheckEnabled()), button -> {
 			config.setGuiTitleCheckEnabled(!config.isGuiTitleCheckEnabled());
 			button.setMessage(onOffText("macherautosell.config.title_check", config.isGuiTitleCheckEnabled()));
-		}).dimensions(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT).build());
+		}).bounds(cx - WIDGET_WIDTH / 2, y, WIDGET_WIDTH, WIDGET_HEIGHT).build());
 		y += ROW_HEIGHT;
 
 		addLabeledTextField(cx, y, "macherautosell.config.expected_title",
@@ -174,51 +172,51 @@ public class AutoSellConfigScreen extends Screen {
 	/** Adds a small label row plus the text field below it; returns the y after the block. */
 	private int addLabeledTextField(int cx, int y, String labelKey, String initial, java.util.function.Consumer<String> setter) {
 		fieldLabels.add(new LabelRow(labelKey, y));
-		TextFieldWidget field = new TextFieldWidget(this.textRenderer, cx - TEXT_FIELD_WIDTH / 2,
-				y + LABELED_FIELD_EXTRA, TEXT_FIELD_WIDTH, WIDGET_HEIGHT, Text.translatable(labelKey));
+		EditBox field = new EditBox(this.font, cx - TEXT_FIELD_WIDTH / 2,
+				y + LABELED_FIELD_EXTRA, TEXT_FIELD_WIDTH, WIDGET_HEIGHT, Component.translatable(labelKey));
 		field.setMaxLength(256);
-		field.setText(initial);
-		field.setChangedListener(setter);
-		addDrawableChild(field);
+		field.setValue(initial);
+		field.setResponder(setter);
+		addRenderableWidget(field);
 		return y + ROW_HEIGHT + LABELED_FIELD_EXTRA;
 	}
 
 	@Override
-	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-		super.render(context, mouseX, mouseY, delta);
+	public void extractRenderState(GuiGraphicsExtractor context, int mouseX, int mouseY, float delta) {
+		super.extractRenderState(context, mouseX, mouseY, delta);
 		int tabsY = this.height / 2 - (20 + 12 + tabContentHeight() + 12 + 20) / 2;
 		if (tabsY >= 22) {
-			context.drawCenteredTextWithShadow(this.textRenderer, this.title, this.width / 2, tabsY - 12, 0xFFFFFF);
+			context.centeredText(this.font, this.title, this.width / 2, tabsY - 12, 0xFFFFFF);
 		}
 		for (LabelRow label : fieldLabels) {
-			context.drawTextWithShadow(this.textRenderer, Text.translatable(label.key()),
-					this.width / 2 - TEXT_FIELD_WIDTH / 2, label.y(), 0xA0A0A0);
+			context.text(this.font, Component.translatable(label.key()),
+					this.width / 2 - TEXT_FIELD_WIDTH / 2, label.y(), 0xA0A0A0, true);
 		}
 	}
 
 	@Override
-	public void close() {
-		if (this.client != null) {
+	public void onClose() {
+		if (this.minecraft != null) {
 			config.copyFrom(snapshot); // revert unsaved changes (Done refreshed the snapshot after saving)
-			this.client.setScreen(parent);
+			this.minecraft.setScreenAndShow(parent);
 		}
 	}
 
-	private Text onOffText(String key, boolean value) {
-		return Text.translatable(key, Text.translatable(value ? "macherautosell.on" : "macherautosell.off"));
+	private Component onOffText(String key, boolean value) {
+		return Component.translatable(key, Component.translatable(value ? "macherautosell.on" : "macherautosell.off"));
 	}
 
-	private Text valueText(String key, Enum<?> value) {
+	private Component valueText(String key, Enum<?> value) {
 		final String subKey = switch (value) {
 			case SellMode mode -> mode.translationKey();
 			case TransferMethod method -> method.translationKey();
 			default -> throw new IllegalArgumentException("Unexpected cycling value: " + value);
 		};
-		return Text.translatable(key, Text.translatable(subKey));
+		return Component.translatable(key, Component.translatable(subKey));
 	}
 
 	/** Slider for an int config value with a translated, value-formatted message and step snapping. */
-	private static class IntSliderWidget extends SliderWidget {
+	private static class IntSliderWidget extends AbstractSliderButton {
 		private final String translationKey;
 		private final int min;
 		private final int max;
@@ -226,7 +224,7 @@ public class AutoSellConfigScreen extends Screen {
 		private final IntConsumer setter;
 
 		IntSliderWidget(int x, int y, int width, int height, String translationKey, int min, int max, int step, int initial, IntConsumer setter) {
-			super(x, y, width, height, Text.empty(), (clamp(initial, min, max) - min) / (double) (max - min));
+			super(x, y, width, height, Component.empty(), (clamp(initial, min, max) - min) / (double) (max - min));
 			this.translationKey = translationKey;
 			this.min = min;
 			this.max = max;
@@ -243,7 +241,7 @@ public class AutoSellConfigScreen extends Screen {
 
 		@Override
 		protected void updateMessage() {
-			setMessage(Text.translatable(translationKey, intValue()));
+			setMessage(Component.translatable(translationKey, intValue()));
 		}
 
 		@Override

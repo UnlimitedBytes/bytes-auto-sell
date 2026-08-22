@@ -7,6 +7,7 @@ import com.macher.autosell.ui.AutoSellConfigScreen;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.minecraft.client.Minecraft;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,14 +21,14 @@ public class MacherAutoSellClient implements ClientModInitializer {
 		ModKeybinds.register();
 
 		AutoSellManager manager = AutoSellManager.getInstance();
-		ClientTickEvents.END_CLIENT_TICK.register(client -> {
-			while (ModKeybinds.openSettings().wasPressed()) {
-				client.setScreen(new AutoSellConfigScreen(client.currentScreen));
+		ClientTickEvents.END_CLIENT_TICK.register(minecraft -> {
+			while (ModKeybinds.openSettings().consumeClick()) {
+				minecraft.setScreenAndShow(new AutoSellConfigScreen(minecraft.gui.screen()));
 			}
-			while (ModKeybinds.toggleAutoSell().wasPressed()) {
-				manager.toggle(client);
+			while (ModKeybinds.toggleAutoSell().consumeClick()) {
+				manager.toggle(minecraft);
 			}
-			manager.tick(client);
+			manager.tick(minecraft);
 		});
 
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> manager.onDisconnect());
