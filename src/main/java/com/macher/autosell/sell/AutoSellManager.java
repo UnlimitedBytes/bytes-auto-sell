@@ -68,6 +68,14 @@ public final class AutoSellManager {
 	private static final int MAX_START_FAILURES = 3;
 	private static final int MAX_REJECTED_CYCLES = 3;
 	private static final int MAX_CURSOR_RETURN_TICKS = 100;
+	/** One return-click attempt every N ticks while a cursor stays loaded. */
+	private static final int CURSOR_RETURN_RETRY_TICKS = 10;
+	/**
+	 * Ticks to wait after a sell-button click before interpreting a loaded cursor as a
+	 * real pickup: the client predicts the click locally, so on servers that cancel the
+	 * click while selling, the cursor only clears after one round trip.
+	 */
+	private static final int BUTTON_GRACE_TICKS = 10;
 
 	private enum State {
 		IDLE, COOLDOWN, OPENING, TRANSFERRING, WAIT_REOPEN, WAIT_CYCLE
@@ -86,10 +94,12 @@ public final class AutoSellManager {
 	private int transferCountdown;
 	private int startFailures;
 	private int rejectedCycles;
-	/** Consecutive button clicks that picked up a stack instead of selling. */
+	/** Consecutive button clicks whose cursor pickup persisted beyond the server-response grace window. */
 	private int buttonFailures;
-	/** Set when a sell-button click is issued; observed (and cleared) on the next tick. */
+	/** Set when a sell-button click is issued; observed (and cleared) once the grace window expires. */
 	private boolean buttonClickPending;
+	/** Countdown after a button click during which a loaded cursor is not yet trusted. */
+	private int buttonGraceTicks;
 	/** Whether the current WAIT period observed a failed button click. */
 	private boolean buttonFailedThisWait;
 	/** Consecutive ticks spent trying to return a loaded cursor stack. */
@@ -155,6 +165,7 @@ public final class AutoSellManager {
 		buttonFailures = 0;
 		buttonClickPending = false;
 		buttonFailedThisWait = false;
+		buttonGraceTicks = 0;
 		cursorReturnTicks = 0;
 		buttonRemapNotified = false;
 		screenAtCommand = null;
@@ -239,7 +250,9 @@ public final class AutoSellManager {
 				disableWithFeedback(client, Text.translatable("macherautosell.msg.cursor_stuck"));
 				return;
 			}
-			returnCursorStack(client, handler);
+			if (cursorReturnTicks % CURSOR_RETURN_RETRY_TICKS == 1) {
+				returnCursorStack(client, handler);
+			}
 			return;
 		}
 		cursorReturnTicks = 0;
@@ -347,6 +360,7 @@ public final class AutoSellManager {
 			click(client, handler, slot, SlotActionType.PICKUP);
 			buttonClickPending = true;
 			buttonFailedThisWait = false;
+			buttonGraceTicks = BUTTON_GRACE_TICKS;
 			state = State.WAIT_CYCLE;
 		}
 	}
@@ -366,10 +380,18 @@ public final class AutoSellManager {
 		if (isSellGui(client.currentScreen)) {
 			GenericContainerScreenHandler handler = sellGuiHandler(client);
 			if (!handler.getCursorStack().isEmpty()) {
-				// A loaded cursor here means the sell-button click picked up a stack
-				// instead of selling. Count at most one failure per issued click
-				// (buttonClickPending), never per tick — a slot that never sells would
-				// otherwise juggle items between GUI and inventory forever.
+				if (buttonGraceTicks > 0) {
+					// The client predicts the button click locally: on servers that
+					// cancel the click while selling, the cursor only clears after one
+					// round trip. Do not interpret or touch a loaded cursor yet.
+					buttonGraceTicks--;
+					return;
+				}
+				// The cursor is still loaded beyond the grace window: the sell-button
+				// click genuinely picked up a stack instead of selling. Count at most
+				// one failure per issued click (buttonClickPending), never per tick —
+				// a slot that never sells would otherwise juggle items between GUI
+				// and inventory forever.
 				if (buttonClickPending) {
 					buttonClickPending = false;
 					buttonFailures++;
@@ -379,17 +401,22 @@ public final class AutoSellManager {
 					disableWithFeedback(client, Text.translatable("macherautosell.msg.cursor_stuck"));
 					return;
 				}
-				// Invariant 1: return the stack before anything else; this may itself
-				// disable auto-sell if there is nowhere safe to put it.
-				returnCursorStack(client, handler);
+				// Invariant 1: return the stack (with backoff — the server may be
+				// rejecting the clicks); this may itself disable auto-sell if there
+				// is nowhere safe to put it.
+				if (cursorReturnTicks % CURSOR_RETURN_RETRY_TICKS == 1) {
+					returnCursorStack(client, handler);
+				}
 				if (enabled && buttonFailures >= MAX_REJECTED_CYCLES) {
 					disableWithFeedback(client, Text.translatable("macherautosell.msg.disabled_button"));
 				}
-				// The reopen countdown stays paused on purpose while the cursor is
-				// being returned — do not reorder this with the timer decrement.
+				// The reopen countdown stays paused on purpose while the grace window
+				// runs and while the cursor is being returned — do not reorder this
+				// with the timer decrement.
 				return;
 			}
 		}
+		buttonGraceTicks = Math.max(0, buttonGraceTicks - 1);
 		cursorReturnTicks = 0;
 		if (--timer > 0) {
 			return;
