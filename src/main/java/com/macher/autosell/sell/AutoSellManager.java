@@ -199,7 +199,7 @@ public final class AutoSellManager {
 	private void startCycle(Minecraft client) {
 		// Never send the sell command while the player has a screen open: the command
 		// response would be indistinguishable from it.
-		if (client.gui.screen() != null) {
+		if (client.screen != null) {
 			state = State.IDLE;
 			return;
 		}
@@ -208,14 +208,14 @@ public final class AutoSellManager {
 			startFailure(client, "macherautosell.msg.empty_command");
 			return;
 		}
-		screenAtCommand = client.gui.screen();
+		screenAtCommand = client.screen;
 		client.player.connection.sendCommand(command);
 		state = State.OPENING;
 		timer = OPEN_GUI_TIMEOUT_TICKS;
 	}
 
 	private void tickOpening(Minecraft client) {
-		Screen screen = client.gui.screen();
+		Screen screen = client.screen;
 		// Only accept a screen that appeared promptly after the command was sent; a
 		// GUI appearing late (or one the player had already opened) is not accepted
 		// as the command response.
@@ -253,7 +253,7 @@ public final class AutoSellManager {
 	}
 
 	private void tickTransferring(Minecraft client) {
-		if (!isSellGui(client.gui.screen())) {
+		if (!isSellGui(client.screen)) {
 			// The GUI was closed or replaced — never touch anything else.
 			resetState();
 			return;
@@ -398,7 +398,7 @@ public final class AutoSellManager {
 	}
 
 	private void tickWaitCycle(Minecraft client) {
-		if (isSellGui(client.gui.screen())) {
+		if (isSellGui(client.screen)) {
 			ChestMenu menu = sellGuiMenu(client);
 			if (!menu.getCarried().isEmpty()) {
 				if (buttonGraceTicks > 0) {
@@ -460,7 +460,7 @@ public final class AutoSellManager {
 			state = State.IDLE;
 			return;
 		}
-		if (isSellGui(client.gui.screen())) {
+		if (isSellGui(client.screen)) {
 			beginTransferring();
 		} else {
 			startCycle(client);
@@ -509,7 +509,7 @@ public final class AutoSellManager {
 	}
 
 	private ChestMenu sellGuiMenu(Minecraft client) {
-		AbstractContainerScreen<?> containerScreen = (AbstractContainerScreen<?>) client.gui.screen();
+		AbstractContainerScreen<?> containerScreen = (AbstractContainerScreen<?>) client.screen;
 		return (ChestMenu) containerScreen.getMenu();
 	}
 
