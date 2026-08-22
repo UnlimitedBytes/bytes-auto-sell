@@ -7,7 +7,8 @@ extra packets, no altered packet fields.
 Audit basis: disassembly (`javap -c`) of the yarn-mapped Minecraft 1.21.11 client in
 the Loom cache, cross-checked against the mod's complete egress inventory. The vanilla
 call paths are identical in the 26.x ports (only the mapping names differ; the mojmap
-names are listed alongside).
+names are listed alongside and were bytecode-verified against the 26.1 and 26.2 jars
+during the port review).
 
 ## Egress inventory
 
@@ -69,7 +70,11 @@ the mod never constructs packets itself and always enters through this vanilla m
 the prediction and the packet payload (including the synchronized slot contents) are
 produced by vanilla code and match a manual click exactly.
 
-Mojmap (26.x): `MultiPlayerGameMode.click(containerId, slotId, button, ClickType, Player)`.
+Mojmap (26.x): `MultiPlayerGameMode.handleContainerInput(containerId, slotId, button,
+ContainerInput, Player)` — bytecode-verified in the 26.x jars to be the exact method
+`AbstractContainerScreen.slotClicked` uses for manual clicks, building the identical
+`ServerboundContainerClickPacket` with the same local prediction. `SlotActionType`
+values map to `ContainerInput.PICKUP` / `ContainerInput.QUICK_MOVE`.
 
 ### 3. GUI close — identical to pressing E/Esc
 
@@ -82,7 +87,8 @@ Mojmap (26.x): `LocalPlayer.closeContainer()`.
 ### 4. Feedback messages — no traffic at all
 
 `player.sendMessage(Text, true)` routes to `MessageHandler.onGameMessage` — a purely
-client-side overlay/action-bar display. Mojmap: `displayClientMessage(Component, boolean)`.
+client-side overlay/action-bar display. Mojmap (26.x): `sendOverlayMessage(Component)`
+(routes to the chat listener's overlay handler; no packet).
 
 ## The one remaining (non-protocol) difference: timing
 
