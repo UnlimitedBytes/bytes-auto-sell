@@ -19,8 +19,8 @@ Read this file completely before making any change.
 
 ```
 gradle.properties          # all dependency/toolchain versions (single source of truth)
-build.gradle               # fabric-loom build (split main/client source sets)
-src/client/java/com/macher/autosell/
+build.gradle               # fabric-loom-remap build (single main source set, classic layout)
+src/main/java/com/macher/autosell/
     MacherAutoSellClient.java    # client entrypoint: config load, keybinds, tick wiring
     config/AutoSellConfig.java   # JSON config (load/save/sanitize/clamp)
     config/SellMode.java         # CLOSE_GUI | KEEP_OPEN
@@ -32,11 +32,12 @@ src/client/java/com/macher/autosell/
     util/TitleMatcher.java       # GUI title check (pure, unit-tested)
     ui/AutoSellConfigScreen.java # in-game settings screen
     compat/ModMenuIntegration.java # Mod Menu entrypoint (only loaded if Mod Menu present)
-src/client/resources/assets/macher-auto-sell/
-    lang/en_us.json              # ALL user-facing strings
-    icon.png
-src/main/resources/fabric.mod.json
-src/client/test/... (unit tests for the pure logic classes)
+src/main/resources/
+    fabric.mod.json              # mod manifest (version expanded from gradle.properties)
+    assets/macher-auto-sell/
+        lang/en_us.json          # ALL user-facing strings
+        icon.png
+src/test/java/                  # unit tests for the pure logic classes
 ```
 
 ## Build & Test
@@ -57,7 +58,7 @@ src/client/test/... (unit tests for the pure logic classes)
 |----------|---------|---------------------|
 | `main`   | Releases only. Every merge into `main` is a tagged, QA-approved release. | Must always build; code is tested and reviewed. |
 | `dev`    | Integration branch. | Mostly stable; may occasionally break. |
-| `feature/<name>` | One logical change, branched **from `dev``. | Untested until reviewed. |
+| `feature/<name>` | One logical change, branched **from `dev`**. | Untested until reviewed. |
 
 **Hard rules**
 
@@ -146,6 +147,8 @@ The reviewer acts as a senior Minecraft/Fabric engineer with **zero tolerance**:
 3. **Never sell armor or offhand.** Only the 36 main inventory + hotbar slots are moved.
 4. **Fail safe.** After any abnormal condition (GUI replaced/closed, timeout, disconnect),
    the state machine resets to IDLE and re-syncs with reality before acting again.
+   Repeated failed starts or fully rejected cycles disable auto-sell with a message
+   instead of looping forever, and a disconnect always turns it off.
 
 ## Versioning
 
