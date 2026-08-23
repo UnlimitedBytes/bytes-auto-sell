@@ -314,8 +314,9 @@ public final class AutoSellManager {
 			cycleStartItems = items;
 		} else if (items == lastPlayerItemCount) {
 			if (++stallCounter >= stallLimitTicks()) {
-				// Secondary safety net behind the post-burst check (e.g. a stack the
-				// client cannot move at all): trigger the sell after a full window.
+				// Secondary safety net behind the post-burst check: catches progress
+				// that only becomes visible after the server reverts predicted
+				// clicks (invisible to same-tick local state). Trigger the sell.
 				finishDeposit(client, handler, true);
 				return;
 			}
@@ -331,9 +332,11 @@ public final class AutoSellManager {
 		transferCountdown = scheduler.nextDelayTicks(config.getTransferDelayTicks(), config.isRandomizeTransferDelay());
 		transferBurst(client, handler, containerSlots);
 		if (countPlayerItems(handler, containerSlots) == items) {
-			// The burst could not deposit a single stack (the sell GUI is full, or
-			// the server silently refused the clicks): trigger the sell immediately
-			// instead of idling until the much slower stall window below expires.
+			// Not a single stack was deposited by this burst as observed locally
+			// (the sell GUI is full, or nothing can be moved): trigger the sell
+			// immediately instead of idling until the much slower stall window
+			// below expires. Server-side reverts of predicted clicks only become
+			// visible after a round trip and are left to that stall net.
 			// Safe wrt invariant 1: a burst always ends with an empty cursor —
 			// PICKUP breaks before picking when no free target slot exists.
 			finishDeposit(client, handler, true);
