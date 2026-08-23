@@ -141,14 +141,54 @@ The reviewer acts as a senior Minecraft/Fabric engineer with **zero tolerance**:
 1. **Never drop items.** Never close a GUI or click a sell button while the cursor holds
    an item (vanilla would drop it). Return the cursor stack first; if impossible, abort
    the cycle and leave the GUI open.
-2. **Only touch the sell GUI.** Interact only with `GenericContainerScreenHandler` screens,
-   and only when the (optional) GUI title check passes. A blank expected title with the
-   check enabled matches nothing, never everything.
+2. **Only touch the sell GUI.** Interact only with `GenericContainerScreenHandler` screens
+   (`ChestMenu` on 26.x), and only when the (optional) GUI title check passes. A blank
+   expected title with the check enabled matches nothing, never everything.
 3. **Never sell armor or offhand.** Only the 36 main inventory + hotbar slots are moved.
-4. **Fail safe.** After any abnormal condition (GUI replaced/closed, timeout, disconnect),
-   the state machine resets to IDLE and re-syncs with reality before acting again.
-   Repeated failed starts or fully rejected cycles disable auto-sell with a message
-   instead of looping forever, and a disconnect always turns it off.
+4. **Fail safe.** The sell GUI closing or being replaced while the mod is working it
+   disables auto-sell immediately (keybinds are unusable while a screen is open, so
+   silently continuing would lock the player out of stopping it; player and server
+   closes are treated the same way). Timeouts reset the state machine to IDLE with a
+   cooldown and re-sync with reality before acting again. Repeated failed starts
+   disable auto-sell with a message instead of looping forever. A sell GUI that
+   repeatedly accepts nothing (e.g. it is full) never disables auto-sell: in Keep
+   Open mode the mod retries the configured sell button up to three times and then
+   closes and reopens the GUI (on servers that sell on close this flushes the
+   contents), and in Close GUI mode it keeps cycling since every reopen starts
+   fresh — a stopped bot loses more than a retry. A disconnect always turns it off.
+5. **Protocol legitimacy** (see docs/PROTOCOL-AUDIT.md). All network traffic must go
+   through the vanilla client methods — `sendChatCommand` (`sendCommand` on 26.x),
+   `clickSlot` (`handleContainerInput` on 26.x), `closeHandledScreen` (`closeContainer`)
+   — so every packet is byte-identical to manual execution. Never construct, modify, or
+   schedule raw packets.
+
+## Multi-Version Support
+
+The mod supports multiple Minecraft versions, one branch per version:
+
+| Minecraft | Branch | Java | Toolchain |
+|---|---|---|---|
+| 1.21.11 | `mc/1.21.11` (mirrors dev/main) | 21 | yarn mappings, `fabric-loom-remap` (obfuscated) |
+| 26.1 | `mc/26.1` | 25 | no mappings (unobfuscated), `fabric-loom`, Mojang official names |
+| 26.1.1 | `mc/26.1.1` | 25 | same |
+| 26.1.2 | `mc/26.1.2` | 25 | same |
+| 26.2 | `mc/26.2` | 25 | same |
+
+Rules:
+
+- `main`/`dev` are the primary development line (currently 1.21.11, yarn names).
+  `mc/1.21.11` mirrors that line for uniform per-version branch names.
+- The 26.x branches contain the same logic ported to Mojang official names
+  (`MinecraftClient`→`Minecraft`, `clickSlot`→`click`, `SlotActionType`→`ClickType`,
+  `GenericContainerScreenHandler`→`ChestMenu`, widgets `ButtonWidget`→`Button`,
+  `TextFieldWidget`→`EditBox`, etc.) with per-version dependency pins in
+  `gradle.properties` and the non-remap Loom plugin.
+- Change flow: implement on `dev` (primary), then port to each affected `mc/*` branch
+  by cherry-picking and resolving the mapping renames. Changes on `mc/*` branches
+  require the same code-review gate and a green build before being pushed there.
+- Version scheme: `mod_version` is identical across ports; artifact versions carry a
+  `+mc<version>` suffix automatically (e.g. `1.0.0+mc26.2`). Release tags on `main`
+  remain plain `vX.Y.Z`.
 
 ## Versioning
 
