@@ -145,10 +145,13 @@ The reviewer acts as a senior Minecraft/Fabric engineer with **zero tolerance**:
    (`ChestMenu` on 26.x), and only when the (optional) GUI title check passes. A blank
    expected title with the check enabled matches nothing, never everything.
 3. **Never sell armor or offhand.** Only the 36 main inventory + hotbar slots are moved.
-4. **Fail safe.** After any abnormal condition (GUI replaced/closed, timeout, disconnect),
-   the state machine resets to IDLE and re-syncs with reality before acting again.
-   Repeated failed starts or fully rejected cycles disable auto-sell with a message
-   instead of looping forever, and a disconnect always turns it off.
+4. **Fail safe.** The sell GUI closing or being replaced while the mod is working it
+   disables auto-sell immediately (keybinds are unusable while a screen is open, so
+   silently continuing would lock the player out of stopping it; player and server
+   closes are treated the same way). Timeouts reset the state machine to IDLE with a
+   cooldown and re-sync with reality before acting again. Repeated failed starts or
+   fully rejected cycles disable auto-sell with a message instead of looping forever,
+   and a disconnect always turns it off.
 5. **Protocol legitimacy** (see docs/PROTOCOL-AUDIT.md). All network traffic must go
    through the vanilla client methods — `sendChatCommand` (`sendCommand` on 26.x),
    `clickSlot` (`handleContainerInput` on 26.x), `closeHandledScreen` (`closeContainer`)
