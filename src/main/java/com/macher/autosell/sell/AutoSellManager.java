@@ -35,9 +35,13 @@ import java.util.Set;
  * </pre>
  *
  * Failure budgets: three consecutive failed cycle starts (no GUI / empty command),
- * three consecutive stall-terminated cycles without inventory progress, or three
+ * three consecutive cycles terminated without any inventory progress, or three
  * consecutive button clicks that pick a stack up instead of selling, disable
- * auto-sell with a message, instead of spamming the server forever.
+ * auto-sell with a message, instead of spamming the server forever. The sell GUI
+ * closing or being replaced while it is being worked disables auto-sell immediately:
+ * keybinds are unusable while a screen is open, so silently continuing would lock
+ * the player out of stopping the mod (player and server closes are deliberately
+ * treated the same way).
  *
  * Safety invariants (see AGENTS.md — never break these):
  * <ol>
@@ -49,8 +53,9 @@ import java.util.Set;
  *       within the container's own region are used as button slots.</li>
  *   <li>Only the 36 hotbar/main inventory slots are ever moved; armor and offhand are
  *       never part of a chest screen handler anyway.</li>
- *   <li>Any abnormal condition (GUI replaced, timeout, disconnect) resets to IDLE,
- *       and a disconnect always turns auto-sell off — it never resumes on its own.</li>
+ *   <li>Fail safe: a vanished sell GUI disables auto-sell, timeouts fall back to a
+ *       cooldown, and a disconnect always turns auto-sell off — it never resumes
+ *       on its own after an abnormal condition.</li>
  * </ol>
  */
 public final class AutoSellManager {
@@ -273,8 +278,12 @@ public final class AutoSellManager {
 
 	private void tickTransferring(MinecraftClient client) {
 		if (client.currentScreen != keptOpenScreen) {
-			// The GUI was closed or replaced — never touch anything else.
-			resetState();
+			// The sell GUI vanished while this mod was working it: it was closed or
+			// replaced by the player (or the server). Disable instead of silently
+			// continuing — while any screen is open the toggle keybind cannot be
+			// used, so a silent restart loop would lock the user out of stopping
+			// auto-sell.
+			disableWithFeedback(client, Text.translatable("macherautosell.msg.disabled_closed"));
 			return;
 		}
 		GenericContainerScreenHandler handler = sellGuiHandler(client);
@@ -305,7 +314,9 @@ public final class AutoSellManager {
 			cycleStartItems = items;
 		} else if (items == lastPlayerItemCount) {
 			if (++stallCounter >= stallLimitTicks()) {
-				// No progress for a while (sell GUI likely full): trigger the sell anyway.
+				// Secondary safety net behind the post-burst check: catches progress
+				// that only becomes visible after the server reverts predicted
+				// clicks (invisible to same-tick local state). Trigger the sell.
 				finishDeposit(client, handler, true);
 				return;
 			}
@@ -320,6 +331,16 @@ public final class AutoSellManager {
 		}
 		transferCountdown = scheduler.nextDelayTicks(config.getTransferDelayTicks(), config.isRandomizeTransferDelay());
 		transferBurst(client, handler, containerSlots);
+		if (countPlayerItems(handler, containerSlots) == items) {
+			// Not a single stack was deposited by this burst as observed locally
+			// (the sell GUI is full, or nothing can be moved): trigger the sell
+			// immediately instead of idling until the much slower stall window
+			// below expires. Server-side reverts of predicted clicks only become
+			// visible after a round trip and are left to that stall net.
+			// Safe wrt invariant 1: a burst always ends with an empty cursor —
+			// PICKUP breaks before picking when no free target slot exists.
+			finishDeposit(client, handler, true);
+		}
 	}
 
 	/**
@@ -356,7 +377,7 @@ public final class AutoSellManager {
 			} else {
 				int target = findEmptyContainerSlot(handler, containerSlots, usedContainerSlots);
 				if (target < 0) {
-					break; // sell GUI is full; stall detection will trigger the sell
+					break; // sell GUI is full; the post-burst check triggers the sell
 				}
 				click(client, handler, source, SlotActionType.PICKUP); // pick the stack up
 				click(client, handler, target, SlotActionType.PICKUP); // place it into the sell GUI
@@ -419,45 +440,51 @@ public final class AutoSellManager {
 	}
 
 	private void tickWaitCycle(MinecraftClient client) {
-		if (client.currentScreen == keptOpenScreen) {
-			// Still the exact GUI this mod kept open (identity, not isSellGui).
-			GenericContainerScreenHandler handler = sellGuiHandler(client);
-			if (!handler.getCursorStack().isEmpty()) {
-				if (buttonGraceTicks > 0) {
-					// The client predicts the button click locally: on servers that
-					// cancel the click while selling, the cursor only clears after one
-					// round trip. Do not interpret or touch a loaded cursor yet.
-					buttonGraceTicks--;
-					return;
-				}
-				// The cursor is still loaded beyond the grace window: the sell-button
-				// click genuinely picked up a stack instead of selling. Count at most
-				// one failure per issued click (buttonClickPending), never per tick —
-				// a slot that never sells would otherwise juggle items between GUI
-				// and inventory forever.
-				if (buttonClickPending) {
-					buttonClickPending = false;
-					buttonFailures++;
-					buttonFailedThisWait = true;
-				}
-				if (++cursorReturnTicks > MAX_CURSOR_RETURN_TICKS) {
-					disableWithFeedback(client, Text.translatable("macherautosell.msg.cursor_stuck"));
-					return;
-				}
-				// Invariant 1: return the stack (with backoff — the server may be
-				// rejecting the clicks); this may itself disable auto-sell if there
-				// is nowhere safe to put it.
-				if (shouldRetryReturn()) {
-					returnCursorStack(client, handler);
-				}
-				if (enabled && buttonFailures >= MAX_REJECTED_CYCLES) {
-					disableWithFeedback(client, Text.translatable("macherautosell.msg.disabled_button"));
-				}
-				// The reopen countdown stays paused on purpose while the grace window
-				// runs and while the cursor is being returned — do not reorder this
-				// with the timer decrement.
+		if (client.currentScreen != keptOpenScreen) {
+			// Same close policy as TRANSFERRING: the kept-open sell GUI is gone
+			// (player closed it — keybinds are unusable inside a screen, so this is
+			// the only way to honor a manual stop; server closes are indistinguishable
+			// and fail safe the same way). Do not restart on our own.
+			disableWithFeedback(client, Text.translatable("macherautosell.msg.disabled_closed"));
+			return;
+		}
+		// Still the exact GUI this mod kept open (identity, not isSellGui).
+		GenericContainerScreenHandler handler = sellGuiHandler(client);
+		if (!handler.getCursorStack().isEmpty()) {
+			if (buttonGraceTicks > 0) {
+				// The client predicts the button click locally: on servers that
+				// cancel the click while selling, the cursor only clears after one
+				// round trip. Do not interpret or touch a loaded cursor yet.
+				buttonGraceTicks--;
 				return;
 			}
+			// The cursor is still loaded beyond the grace window: the sell-button
+			// click genuinely picked up a stack instead of selling. Count at most
+			// one failure per issued click (buttonClickPending), never per tick —
+			// a slot that never sells would otherwise juggle items between GUI
+			// and inventory forever.
+			if (buttonClickPending) {
+				buttonClickPending = false;
+				buttonFailures++;
+				buttonFailedThisWait = true;
+			}
+			if (++cursorReturnTicks > MAX_CURSOR_RETURN_TICKS) {
+				disableWithFeedback(client, Text.translatable("macherautosell.msg.cursor_stuck"));
+				return;
+			}
+			// Invariant 1: return the stack (with backoff — the server may be
+			// rejecting the clicks); this may itself disable auto-sell if there
+			// is nowhere safe to put it.
+			if (shouldRetryReturn()) {
+				returnCursorStack(client, handler);
+			}
+			if (enabled && buttonFailures >= MAX_REJECTED_CYCLES) {
+				disableWithFeedback(client, Text.translatable("macherautosell.msg.disabled_button"));
+			}
+			// The reopen countdown stays paused on purpose while the grace window
+			// runs and while the cursor is being returned — do not reorder this
+			// with the timer decrement.
+			return;
 		}
 		buttonGraceTicks = Math.max(0, buttonGraceTicks - 1);
 		if (buttonGraceTicks == 0) {
@@ -482,11 +509,8 @@ public final class AutoSellManager {
 			state = State.IDLE;
 			return;
 		}
-		if (client.currentScreen == keptOpenScreen) {
-			beginTransferring();
-		} else {
-			startCycle(client);
-		}
+		// The kept-open GUI is still open (checked above): resume depositing into it.
+		beginTransferring();
 	}
 
 	/**
