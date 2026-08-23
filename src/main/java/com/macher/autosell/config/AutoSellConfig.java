@@ -24,8 +24,8 @@ public final class AutoSellConfig {
 
 	public static final String DEFAULT_SELL_COMMAND = "/sell";
 	public static final int DEFAULT_TRANSFER_DELAY_TICKS = 20;
-	public static final int DEFAULT_TRANSFER_BURST = 1;
-	public static final int DEFAULT_REOPEN_DELAY_TICKS = 60;
+	public static final int DEFAULT_TRANSFER_BURST = 10;
+	public static final int DEFAULT_REOPEN_DELAY_TICKS = 20;
 	public static final int DEFAULT_BUTTON_SLOT = 35;
 
 	public static final int MIN_TRANSFER_DELAY_TICKS = 0;
