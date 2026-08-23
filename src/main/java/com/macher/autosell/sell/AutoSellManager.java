@@ -491,11 +491,11 @@ public final class AutoSellManager {
 			// and inventory forever.
 			if (buttonClickPending) {
 				buttonClickPending = false;
-				if (sellButtonRetries > 0 || guiFlushPending) {
-					// Recovery clicks may legitimately pick a placeholder stack off a
-					// full GUI; they must not feed the disabled_button budget — the
-					// flush reopen is the real verdict on whether selling works.
-				} else {
+				// Recovery clicks may legitimately pick a placeholder stack off a
+				// full GUI; they must not feed the disabled_button budget — the
+				// flush reopen is the real verdict on whether selling works.
+				boolean recovering = sellButtonRetries > 0 || guiFlushPending;
+				if (!recovering) {
 					buttonFailures++;
 					buttonFailedThisWait = true;
 				}
