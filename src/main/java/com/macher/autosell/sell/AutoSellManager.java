@@ -8,10 +8,10 @@ import com.macher.autosell.util.TitleMatcher;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.world.inventory.ChestMenu;
-import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ContainerInput;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraft.world.inventory.ContainerInput;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -57,6 +57,9 @@ import java.util.Set;
  *       cooldown, and a disconnect always turns auto-sell off — it never resumes
  *       on its own after an abnormal condition.</li>
  * </ol>
+ *
+ * Protocol legitimacy (docs/PROTOCOL-AUDIT.md): the only network traffic is caused
+ * by the vanilla methods sendCommand, click and closeContainer.
  */
 public final class AutoSellManager {
 	private static final AutoSellManager INSTANCE = new AutoSellManager();
