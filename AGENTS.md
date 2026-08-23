@@ -149,9 +149,13 @@ The reviewer acts as a senior Minecraft/Fabric engineer with **zero tolerance**:
    disables auto-sell immediately (keybinds are unusable while a screen is open, so
    silently continuing would lock the player out of stopping it; player and server
    closes are treated the same way). Timeouts reset the state machine to IDLE with a
-   cooldown and re-sync with reality before acting again. Repeated failed starts or
-   fully rejected cycles disable auto-sell with a message instead of looping forever,
-   and a disconnect always turns it off.
+   cooldown and re-sync with reality before acting again. Repeated failed starts
+   disable auto-sell with a message instead of looping forever. A sell GUI that
+   repeatedly accepts nothing (e.g. it is full) never disables auto-sell: in Keep
+   Open mode the mod retries the configured sell button up to three times and then
+   closes and reopens the GUI (on servers that sell on close this flushes the
+   contents), and in Close GUI mode it keeps cycling since every reopen starts
+   fresh — a stopped bot loses more than a retry. A disconnect always turns it off.
 5. **Protocol legitimacy** (see docs/PROTOCOL-AUDIT.md). All network traffic must go
    through the vanilla client methods — `sendChatCommand` (`sendCommand` on 26.x),
    `clickSlot` (`handleContainerInput` on 26.x), `closeHandledScreen` (`closeContainer`)
