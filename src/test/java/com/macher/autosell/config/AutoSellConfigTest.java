@@ -21,9 +21,9 @@ class AutoSellConfigTest {
 		assertEquals(TransferMethod.SHIFT, config.getTransferMethod());
 		assertEquals(SellMode.CLOSE_GUI, config.getSellMode());
 		assertEquals(20, config.getTransferDelayTicks());
-		assertEquals(1, config.getTransferBurst());
+		assertEquals(10, config.getTransferBurst());
 		assertEquals(false, config.isRandomizeTransferDelay());
-		assertEquals(60, config.getReopenDelayTicks());
+		assertEquals(20, config.getReopenDelayTicks());
 		assertEquals(false, config.isGuiTitleCheckEnabled());
 		assertEquals("", config.getExpectedGuiTitle());
 		assertEquals(35, config.getKeepOpenButtonSlot());
