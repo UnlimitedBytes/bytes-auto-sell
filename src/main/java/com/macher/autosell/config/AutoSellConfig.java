@@ -23,7 +23,7 @@ public final class AutoSellConfig {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	public static final String DEFAULT_SELL_COMMAND = "/sell";
-	public static final int DEFAULT_TRANSFER_DELAY_TICKS = 1;
+	public static final int DEFAULT_TRANSFER_DELAY_TICKS = 20;
 	public static final int DEFAULT_TRANSFER_BURST = 1;
 	public static final int DEFAULT_REOPEN_DELAY_TICKS = 60;
 	public static final int DEFAULT_BUTTON_SLOT = 35;
