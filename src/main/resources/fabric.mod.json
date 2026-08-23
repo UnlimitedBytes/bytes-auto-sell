@@ -5,9 +5,11 @@
 	"name": "Macher Auto Sell",
 	"description": "Automatically sells your inventory through the server's sell GUI. Configurable command, transfer method, transfer speeds and timings.",
 	"authors": [
-		"Macher"
+		"Unlimitedbytes"
 	],
-	"contact": {},
+	"contact": {
+		"homepage": "https://unlimitedbytes.ovh"
+	},
 	"license": "MIT",
 	"icon": "assets/macher-auto-sell/icon.png",
 	"environment": "client",
