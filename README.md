@@ -59,10 +59,10 @@ All settings are available in-game (`O` keybind, or via Mod Menu) and stored in
 | Setting | Default | Description |
 |---|---|---|
 | Sell Command | `/sell` | Command that opens the sell GUI (with or without leading `/`) |
-| Sell Mode | Close GUI | How a sell cycle completes (see above) |
+| Sell Mode | Keep Open | How a sell cycle completes (see above) |
 | Transfer Method | SHIFT | `SHIFT` = shift-clicks stacks; `PICKUP` = cursor pickup/place into empty slots |
-| Item Transfer Speed (ticks) | 20 (1 s) | Delay between transfer steps — lower is faster |
-| Transfer Burst (stacks per tick) | 10 | Stacks moved per step — higher is faster |
+| Item Transfer Speed (ticks) | 1 | Delay between transfer steps — lower is faster |
+| Transfer Burst (stacks per tick) | 1 | Stacks moved per step — higher is faster |
 | Randomize Transfer Delay | OFF | Randomizes the transfer delay (1x–2x the base) for a less robotic cadence |
 | Reopen Delay (ticks) | 20 (1 s) | Delay between sell cycles |
 | GUI Title Check | OFF | Only interact with a GUI whose title exactly matches the expected title |
