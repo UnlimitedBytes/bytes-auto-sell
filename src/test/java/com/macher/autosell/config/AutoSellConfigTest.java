@@ -21,7 +21,7 @@ class AutoSellConfigTest {
 		assertEquals(TransferMethod.SHIFT, config.getTransferMethod());
 		assertEquals(SellMode.KEEP_OPEN, config.getSellMode());
 		assertEquals(1, config.getTransferDelayTicks());
-		assertEquals(1, config.getTransferBurst());
+		assertEquals(10, config.getTransferBurst());
 		assertEquals(false, config.isRandomizeTransferDelay());
 		assertEquals(20, config.getReopenDelayTicks());
 		assertEquals(false, config.isGuiTitleCheckEnabled());
