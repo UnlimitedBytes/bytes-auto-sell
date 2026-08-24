@@ -1,6 +1,6 @@
 # Protocol Legitimacy Audit
 
-Goal: prove that every network interaction of Macher Auto Sell is **byte-identical on
+Goal: prove that every network interaction of Bytes Auto Sell is **byte-identical on
 the wire** to the same action performed manually by a player — no custom packets, no
 extra packets, no altered packet fields.
 
