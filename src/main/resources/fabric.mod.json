@@ -1,24 +1,26 @@
 {
 	"schemaVersion": 1,
-	"id": "macher-auto-sell",
+	"id": "bytes-auto-sell",
 	"version": "${version}",
-	"name": "Macher Auto Sell",
+	"name": "Bytes Auto Sell",
 	"description": "Automatically sells your inventory through the server's sell GUI. Configurable command, transfer method, transfer speeds and timings.",
 	"authors": [
 		"Unlimitedbytes"
 	],
 	"contact": {
-		"homepage": "https://unlimitedbytes.ovh"
+		"homepage": "https://unlimitedbytes.ovh",
+		"sources": "https://github.com/UnlimitedBytes/bytes-auto-sell",
+		"issues": "https://github.com/UnlimitedBytes/bytes-auto-sell/issues"
 	},
 	"license": "MIT",
-	"icon": "assets/macher-auto-sell/icon.png",
+	"icon": "assets/bytes-auto-sell/icon.png",
 	"environment": "client",
 	"entrypoints": {
 		"client": [
-			"com.macher.autosell.MacherAutoSellClient"
+			"ovh.unlimitedbytes.autosell.BytesAutoSellClient"
 		],
 		"modmenu": [
-			"com.macher.autosell.compat.ModMenuIntegration"
+			"ovh.unlimitedbytes.autosell.compat.ModMenuIntegration"
 		]
 	},
 	"depends": {

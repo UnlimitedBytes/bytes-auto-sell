@@ -1,12 +1,12 @@
-# AGENTS.md — Macher Auto Sell
+# AGENTS.md — Bytes Auto Sell
 
 Operating manual for AI agents (and humans) working in this repository.
 Read this file completely before making any change.
 
 ## Project Overview
 
-- **Macher Auto Sell** is a client-side **Fabric mod** for **Minecraft Java Edition 1.21.11** (Java 21, Yarn mappings).
-- Mod id: `macher-auto-sell`. It automatically sells the player's inventory through a
+- **Bytes Auto Sell** is a client-side **Fabric mod** for **Minecraft Java Edition 1.21.11** (Java 21, Yarn mappings).
+- Mod id: `bytes-auto-sell`. It automatically sells the player's inventory through a
   server-provided sell GUI (default command `/sell`), with configurable transfer methods,
   timings and safety checks.
 - Two keybinds (configurable in the vanilla Controls screen):
@@ -20,8 +20,8 @@ Read this file completely before making any change.
 ```
 gradle.properties          # all dependency/toolchain versions (single source of truth)
 build.gradle               # fabric-loom-remap build (single main source set, classic layout)
-src/main/java/com/macher/autosell/
-    MacherAutoSellClient.java    # client entrypoint: config load, keybinds, tick wiring
+src/main/java/ovh/unlimitedbytes/autosell/
+    BytesAutoSellClient.java    # client entrypoint: config load, keybinds, tick wiring
     config/AutoSellConfig.java   # JSON config (load/save/sanitize/clamp)
     config/SellMode.java         # CLOSE_GUI | KEEP_OPEN
     config/TransferMethod.java   # SHIFT | PICKUP
@@ -34,7 +34,7 @@ src/main/java/com/macher/autosell/
     compat/ModMenuIntegration.java # Mod Menu entrypoint (only loaded if Mod Menu present)
 src/main/resources/
     fabric.mod.json              # mod manifest (version expanded from gradle.properties)
-    assets/macher-auto-sell/
+    assets/bytes-auto-sell/
         lang/en_us.json          # ALL user-facing strings
         icon.png
 src/test/java/                  # unit tests for the pure logic classes
@@ -96,7 +96,7 @@ src/test/java/                  # unit tests for the pure logic classes
 4. On FAIL: fix on `dev` (directly or via a short-lived `fix/*` branch), then re-run QA.
 5. On PASS:
    `git checkout main && git merge --no-ff dev -m "Release vX.Y.Z: <summary> (QA passed)"`
-   then `git tag -a vX.Y.Z -m "Macher Auto Sell vX.Y.Z"`.
+   then `git tag -a vX.Y.Z -m "Bytes Auto Sell vX.Y.Z"`.
 
 ### Review charter (harsh reviewer)
 
