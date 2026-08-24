@@ -1,4 +1,4 @@
-# Macher Auto Sell
+# Bytes Auto Sell
 
 A client-side Fabric mod that automatically sells your inventory through your server's
 sell GUI.
@@ -36,7 +36,7 @@ human input; use the transfer speed/burst/randomize settings for a human-like ca
 
 | Keybind (vanilla Controls menu) | Default | Action |
 |---|---|---|
-| Open Settings | `O` | Opens the Macher Auto Sell settings screen |
+| Open Settings | `O` | Opens the Bytes Auto Sell settings screen |
 | Toggle Auto Sell | `K` | Enables/disables auto-selling (action bar feedback) |
 
 While enabled, the mod polls your inventory (the toggle turns itself off whenever you
@@ -54,7 +54,7 @@ leave a server — re-enable it with `K` after joining). When it contains items 
 ## Settings
 
 All settings are available in-game (`O` keybind, or via Mod Menu) and stored in
-`config/macher-auto-sell.json`.
+`config/bytes-auto-sell.json`.
 
 | Setting | Default | Description |
 |---|---|---|
