@@ -113,3 +113,9 @@ network traffic through the vanilla client methods listed above — `sendChatCom
 (`sendCommand`), `clickSlot` (`handleContainerInput`), `closeHandledScreen`
 (`closeContainer`) — and must never construct, modify, or schedule raw packets
 itself.
+
+One sanctioned exception outside the Minecraft protocol: the update check
+(`update/UpdateChecker.java`) performs a single async HTTPS GET to the GitHub
+releases API on server join (opt-out in the config, 5 s timeout, no retries,
+silent on error). It is plain TLS web traffic, not Minecraft protocol traffic,
+and adds no packets to the game connection.

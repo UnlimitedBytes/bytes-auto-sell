@@ -69,6 +69,7 @@ All settings are available in-game (`O` keybind, or via Mod Menu) and stored in
 | GUI Title Check | OFF | Only interact with a GUI whose title exactly matches the expected title |
 | Expected GUI Title | *(empty)* | Title to match when the check is enabled |
 | Keep-Open Button Slot | 35 | Slot clicked to sell in Keep Open mode |
+| Check for Updates on Join | ON | Asks GitHub once per server join whether a newer release exists |
 
 **Tip:** with the GUI Title Check disabled, the mod will treat *any* chest-like GUI
 that appears right after the sell command as the sell GUI. On servers with other
@@ -99,6 +100,16 @@ The mod is built to never crash and never give up, including on high-ping connec
 - On a server (or in singleplayer) with no sell GUI at all, the mod keeps retrying
   the sell command with the capped backoff — one action-bar message per attempt —
   until you toggle it off with `K`.
+
+## Update check
+
+When you join a server, the mod asks GitHub once whether a newer release of Bytes
+Auto Sell exists (`api.github.com/repos/UnlimitedBytes/bytes-auto-sell/releases/latest`)
+and, if so, shows a chat message with a clickable link to that release. This single
+request is the mod's only network traffic besides the Minecraft connection itself:
+it runs asynchronously (never blocks the game), has a 5 s timeout, never retries,
+and stays completely silent on any error. It can be disabled in the settings
+(*Updates → Check for Updates on Join*).
 
 ## Building
 

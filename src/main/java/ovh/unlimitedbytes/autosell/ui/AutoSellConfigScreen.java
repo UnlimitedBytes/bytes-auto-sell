@@ -95,6 +95,14 @@ public final class AutoSellConfigScreen {
 				.setSaveConsumer(config::setExpectedGuiTitle)
 				.build());
 
+		ConfigCategory updates = builder.getOrCreateCategory(Text.translatable("bytesautosell.config.tab.updates"));
+		updates.addEntry(entries.startBooleanToggle(Text.translatable("bytesautosell.config.update_check"), config.isUpdateCheckEnabled())
+				.setDefaultValue(AutoSellConfig.DEFAULT_UPDATE_CHECK)
+				.setYesNoTextSupplier(value -> Text.translatable(value ? "bytesautosell.on" : "bytesautosell.off"))
+				.setTooltip(Text.translatable("bytesautosell.config.update_check.tooltip"))
+				.setSaveConsumer(config::setUpdateCheckEnabled)
+				.build());
+
 		return builder.build();
 	}
 }

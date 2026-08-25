@@ -24,6 +24,8 @@ public final class AutoSellConfig {
 
 	public static final String DEFAULT_SELL_COMMAND = "/sell";
 	public static final SellMode DEFAULT_SELL_MODE = SellMode.KEEP_OPEN;
+	/** Update check default; see {@link ovh.unlimitedbytes.autosell.update.UpdateChecker}. */
+	public static final boolean DEFAULT_UPDATE_CHECK = true;
 	public static final int DEFAULT_TRANSFER_DELAY_TICKS = 1;
 	public static final int DEFAULT_TRANSFER_BURST = 10;
 	public static final int DEFAULT_REOPEN_DELAY_TICKS = 20;
@@ -54,6 +56,8 @@ public final class AutoSellConfig {
 	private String expectedGuiTitle = "";
 	/** Sell-button slot for Keep Open mode; clamped into the GUI's container region at use. */
 	private int keepOpenButtonSlot = DEFAULT_BUTTON_SLOT;
+	/** Whether the GitHub update check runs on server join. */
+	private boolean updateCheckEnabled = DEFAULT_UPDATE_CHECK;
 
 	public static AutoSellConfig get() {
 		return instance;
@@ -113,6 +117,7 @@ public final class AutoSellConfig {
 		this.guiTitleCheckEnabled = other.guiTitleCheckEnabled;
 		this.expectedGuiTitle = other.expectedGuiTitle;
 		this.keepOpenButtonSlot = other.keepOpenButtonSlot;
+		this.updateCheckEnabled = other.updateCheckEnabled;
 	}
 
 	/**
@@ -227,5 +232,13 @@ public final class AutoSellConfig {
 
 	public void setKeepOpenButtonSlot(int keepOpenButtonSlot) {
 		this.keepOpenButtonSlot = clamp(keepOpenButtonSlot, MIN_BUTTON_SLOT, MAX_BUTTON_SLOT);
+	}
+
+	public boolean isUpdateCheckEnabled() {
+		return updateCheckEnabled;
+	}
+
+	public void setUpdateCheckEnabled(boolean updateCheckEnabled) {
+		this.updateCheckEnabled = updateCheckEnabled;
 	}
 }

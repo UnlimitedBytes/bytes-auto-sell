@@ -4,6 +4,7 @@ import ovh.unlimitedbytes.autosell.config.AutoSellConfig;
 import ovh.unlimitedbytes.autosell.keybind.ModKeybinds;
 import ovh.unlimitedbytes.autosell.sell.AutoSellManager;
 import ovh.unlimitedbytes.autosell.ui.AutoSellConfigScreen;
+import ovh.unlimitedbytes.autosell.update.UpdateChecker;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
@@ -31,6 +32,7 @@ public class BytesAutoSellClient implements ClientModInitializer {
 		});
 
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> manager.onDisconnect());
+		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> UpdateChecker.checkOnJoin(client));
 
 		LOGGER.info("Bytes Auto Sell initialized");
 	}

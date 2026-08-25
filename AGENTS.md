@@ -31,6 +31,8 @@ src/main/java/ovh/unlimitedbytes/autosell/
     sell/RetryBackoff.java       # capped exponential backoff for start retries
     util/CommandUtil.java        # sell-command normalization (pure, unit-tested)
     util/TitleMatcher.java       # GUI title check (pure, unit-tested)
+    util/VersionComparator.java  # release-tag vs local-version comparison (pure, unit-tested)
+    update/UpdateChecker.java    # one-shot GitHub update check on join (async, silent on error)
     ui/AutoSellConfigScreen.java # in-game settings screen
     compat/ModMenuIntegration.java # Mod Menu entrypoint (only loaded if Mod Menu present)
 src/main/resources/
@@ -116,10 +118,16 @@ The reviewer acts as a senior Minecraft/Fabric engineer with **zero tolerance**:
 2. Jar contents sane: `fabric.mod.json` present with correct version, `environment: client`,
    entrypoints resolve, lang file packaged.
 3. Security review: no credential harvesting, no network traffic beyond the Minecraft
-   connection itself, no writes outside the mod's own config file, no runtime-obfuscated
-   or reflected code paths, no keylogging beyond the two registered keybinds, the only
-   command ever sent to the server is the configured sell command, no eval/deserialization
-   of untrusted data.
+   connection itself — the sole sanctioned exception is the opt-out update check
+   (`update/UpdateChecker.java`: one async HTTPS GET to
+   `api.github.com/repos/UnlimitedBytes/bytes-auto-sell/releases/latest` per server
+   join, 5 s timeout, no retries, silent on error, disabled by config
+   `updateCheckEnabled`), no writes outside the mod's own config file, no
+   runtime-obfuscated or reflected code paths, no keylogging beyond the two
+   registered keybinds, the only command ever sent to the server is the configured
+   sell command, no eval/deserialization of untrusted data (the update check parses
+   the GitHub JSON into a JsonObject tree and reads two string fields — no POJO
+   binding, no execution).
 4. Config audit: defaults match the specification, all values clamped, corrupt config
    file falls back to defaults instead of crashing.
 5. Runtime hazard audit (code-level): cursor never holds an item when the GUI is closed
@@ -130,7 +138,9 @@ The reviewer acts as a senior Minecraft/Fabric engineer with **zero tolerance**:
 
 - Java 21 language level, Yarn mapping names (no mojmap names, no reflective MC access,
   no mixins unless truly unavoidable — currently zero).
-- All Minecraft API calls stay on the client thread (tick/render). No extra threads.
+- All Minecraft API calls stay on the client thread (tick/render). No extra threads —
+  the sole exception is the update check's async HTTP client, which never touches game
+  state off-thread and marshals its result back with `MinecraftClient#execute`.
 - Pure, game-independent logic (command normalization, title matching, delay scheduling,
   config clamping) lives in small classes under `util`/`config` with unit tests.
 - Every config value is clamped/validated before first use and after every load.
