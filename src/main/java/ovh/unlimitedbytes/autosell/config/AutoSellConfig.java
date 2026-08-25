@@ -23,6 +23,7 @@ public final class AutoSellConfig {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	public static final String DEFAULT_SELL_COMMAND = "/sell";
+	public static final SellMode DEFAULT_SELL_MODE = SellMode.KEEP_OPEN;
 	public static final int DEFAULT_TRANSFER_DELAY_TICKS = 1;
 	public static final int DEFAULT_TRANSFER_BURST = 10;
 	public static final int DEFAULT_REOPEN_DELAY_TICKS = 20;
@@ -43,7 +44,7 @@ public final class AutoSellConfig {
 
 	private String sellCommand = DEFAULT_SELL_COMMAND;
 	private TransferMethod transferMethod = TransferMethod.SHIFT;
-	private SellMode sellMode = SellMode.KEEP_OPEN;
+	private SellMode sellMode = DEFAULT_SELL_MODE;
 	private int transferDelayTicks = DEFAULT_TRANSFER_DELAY_TICKS;
 	private int transferBurst = DEFAULT_TRANSFER_BURST;
 	private boolean randomizeTransferDelay = false;
@@ -127,7 +128,7 @@ public final class AutoSellConfig {
 			transferMethod = TransferMethod.SHIFT;
 		}
 		if (sellMode == null) {
-			sellMode = SellMode.KEEP_OPEN;
+			sellMode = DEFAULT_SELL_MODE;
 		}
 		if (expectedGuiTitle == null) {
 			expectedGuiTitle = "";
@@ -169,7 +170,7 @@ public final class AutoSellConfig {
 	}
 
 	public void setSellMode(SellMode sellMode) {
-		this.sellMode = sellMode != null ? sellMode : SellMode.KEEP_OPEN;
+		this.sellMode = sellMode != null ? sellMode : DEFAULT_SELL_MODE;
 	}
 
 	public int getTransferDelayTicks() {

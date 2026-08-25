@@ -38,7 +38,7 @@ public final class AutoSellConfigScreen {
 				.setSaveConsumer(config::setSellCommand)
 				.build());
 		selling.addEntry(entries.startEnumSelector(Text.translatable("bytesautosell.config.sell_mode"), SellMode.class, config.getSellMode())
-				.setDefaultValue(SellMode.CLOSE_GUI)
+				.setDefaultValue(AutoSellConfig.DEFAULT_SELL_MODE)
 				.setEnumNameProvider(mode -> Text.translatable(((SellMode) mode).translationKey()))
 				.setTooltip(Text.translatable("bytesautosell.config.sell_mode.tooltip"))
 				.setSaveConsumer(config::setSellMode)
