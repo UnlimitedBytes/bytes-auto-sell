@@ -52,6 +52,9 @@ it stays off until you toggle it again). When your inventory contains items it:
    - **Keep Open** — keeps the GUI open, clicks the configured button slot (default 35)
      to sell, then deposits the next batch after the Reopen Delay.
 
+Toggling the mod off and on again while the sell GUI is open resumes selling in that
+same GUI; if you close it in between, the next cycle reopens it via the sell command.
+
 ## Settings
 
 All settings are available in-game (`O` keybind, or via Mod Menu) and stored in
