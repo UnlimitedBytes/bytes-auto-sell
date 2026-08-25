@@ -11,27 +11,24 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
 import net.fabricmc.fabric.api.client.screen.v1.ScreenKeyboardEvents;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.screen.ingame.AbstractSignEditScreen;
+import net.minecraft.client.gui.screen.ingame.BookEditScreen;
+import net.minecraft.client.gui.screen.option.KeybindsScreen;
 import net.minecraft.client.gui.widget.TextFieldWidget;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.Collections;
-import java.util.Set;
-import java.util.WeakHashMap;
 
 public class BytesAutoSellClient implements ClientModInitializer {
 	public static final String MOD_ID = "bytes-auto-sell";
 	public static final Logger LOGGER = LoggerFactory.getLogger("BytesAutoSell");
 
 	/**
-	 * Screens that already carry the in-GUI toggle listener. Screens re-init on
-	 * window resize and when re-shown after a child screen closes; without this
-	 * guard each re-init would stack another listener and one key press would
-	 * toggle the mod multiple times. Weak references: entries vanish with the
-	 * screen instance once it is closed and collected.
+	 * Debounce for the in-screen toggle: GLFW key-repeat re-fires the press event
+	 * (~30 Hz while held) and the repeat action is not part of the event, so two
+	 * presses within this window are treated as one physical press.
 	 */
-	private static final Set<Screen> TOGGLE_KEYBIND_SCREENS =
-			Collections.newSetFromMap(new WeakHashMap<>());
+	private static final long IN_SCREEN_TOGGLE_DEBOUNCE_NS = 250_000_000L;
+	private static long lastInScreenToggleNanos;
 
 	@Override
 	public void onInitializeClient() {
@@ -52,22 +49,31 @@ public class BytesAutoSellClient implements ClientModInitializer {
 		// Vanilla only routes key events to keybinds while no screen is open; the
 		// sell GUI would otherwise lock the player out of stopping the mod. The
 		// toggle keybind is therefore also intercepted inside screens — including
-		// the sell GUI — but never while a text field is focused (typing).
-		ScreenEvents.BEFORE_INIT.register((client, screen, scaledWidth, scaledHeight) -> {
-			if (!TOGGLE_KEYBIND_SCREENS.add(screen)) {
-				return;
-			}
-			ScreenKeyboardEvents.allowKeyPress(screen).register((current, input) -> {
-				if (!ModKeybinds.toggleAutoSell().matchesKey(input)) {
-					return true;
-				}
-				if (current.getFocused() instanceof TextFieldWidget) {
-					return true; // the keystroke belongs to the text field
-				}
-				manager.toggle(client);
-				return false; // consumed: the GUI must not also process it
-			});
-		});
+		// the sell GUI. Fabric replaces the per-screen event on every init (fires
+		// BEFORE_INIT after wiping), so the listener is (re-)registered on EVERY
+		// BEFORE_INIT — after a resize or a child-screen round trip the fresh
+		// event would otherwise carry no listener at all.
+		ScreenEvents.BEFORE_INIT.register((client, screen, scaledWidth, scaledHeight) ->
+				ScreenKeyboardEvents.allowKeyPress(screen).register((current, input) -> {
+					if (!ModKeybinds.toggleAutoSell().matchesKey(input)) {
+						return true;
+					}
+					if (current.getFocused() instanceof TextFieldWidget
+							|| current instanceof BookEditScreen
+							|| current instanceof AbstractSignEditScreen) {
+						return true; // the keystroke belongs to text entry
+					}
+					if (current instanceof KeybindsScreen) {
+						return true; // let the Controls screen capture the key for rebinding
+					}
+					long now = System.nanoTime();
+					if (now - lastInScreenToggleNanos < IN_SCREEN_TOGGLE_DEBOUNCE_NS) {
+						return false; // key repeat: consumed, but not a new press
+					}
+					lastInScreenToggleNanos = now;
+					manager.toggle(client);
+					return false; // consumed: the GUI must not also process it
+				}));
 
 		ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> manager.onDisconnect());
 		ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> UpdateChecker.checkOnJoin(client));

@@ -37,7 +37,7 @@ human input; use the transfer speed/burst/randomize settings for a human-like ca
 | Keybind (vanilla Controls menu) | Default | Action |
 |---|---|---|
 | Open Settings | `O` | Opens the Bytes Auto Sell settings screen |
-| Toggle Auto Sell | `K` | Enables/disables auto-selling — works everywhere, including inside the sell GUI (not while typing in a text field) |
+| Toggle Auto Sell | `K` | Enables/disables auto-selling — works everywhere, including inside the sell GUI (not while typing in chat, a book or a sign) |
 
 While enabled, the mod polls your inventory. It keeps its enabled state across
 disconnects and resumes automatically on the next server join (press `K` to stop it —
@@ -103,8 +103,9 @@ The mod is built to never crash and never give up, including on high-ping connec
 
 ## Update check
 
-When you join a server, the mod asks GitHub once whether a newer release of Bytes
-Auto Sell exists (`api.github.com/repos/UnlimitedBytes/bytes-auto-sell/releases/latest`)
+When you join a multiplayer server, the mod asks GitHub once whether a newer release
+of Bytes Auto Sell exists
+(`api.github.com/repos/UnlimitedBytes/bytes-auto-sell/releases/latest`)
 and, if so, shows a chat message with a clickable link to that release. This single
 request is the mod's only network traffic besides the Minecraft connection itself:
 it runs asynchronously (never blocks the game), has a 5 s timeout, never retries,

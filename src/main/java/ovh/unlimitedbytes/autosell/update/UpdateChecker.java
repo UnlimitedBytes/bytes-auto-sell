@@ -46,6 +46,9 @@ public final class UpdateChecker {
 		if (!AutoSellConfig.get().isUpdateCheckEnabled()) {
 			return;
 		}
+		if (client.getServer() != null) {
+			return; // singleplayer / LAN-integrated server: there is nothing to update against
+		}
 		String localVersion = localVersion();
 		HttpClient http = HttpClient.newBuilder().connectTimeout(TIMEOUT).build();
 		HttpRequest request = HttpRequest.newBuilder(URI.create(RELEASES_API_URL))
