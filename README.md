@@ -90,9 +90,15 @@ The mod is built to never crash and never give up, including on high-ping connec
 - **It never crashes the client.** Every slot click is bounds- and null-checked, and
   the whole state machine is wrapped in a catch-all that resets the current cycle,
   logs, and continues if some unexpected vanilla interaction ever throws.
-- High ping is specifically tolerated: the sell GUI may take up to the full 5 s
-  window to appear (the whole window when the title check is on), and button clicks
-  get a full second of grace before a loaded cursor is treated as a real pickup.
+- High ping is specifically tolerated: button clicks get a full second of grace
+  before a loaded cursor is treated as a real pickup, and the sell GUI may take the
+  full 5 s command window to appear when the **GUI Title Check** is enabled (the
+  exact title proves the GUI is the command's response). With the check disabled the
+  acceptance window stays at 1 s so a chest you open yourself is never mistaken for
+  the sell GUI — enable the title check on high-ping connections.
+- On a server (or in singleplayer) with no sell GUI at all, the mod keeps retrying
+  the sell command with the capped backoff — one action-bar message per attempt —
+  until you toggle it off with `K`.
 
 ## Building
 

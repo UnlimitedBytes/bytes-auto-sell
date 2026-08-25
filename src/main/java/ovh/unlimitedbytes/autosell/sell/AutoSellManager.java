@@ -84,13 +84,13 @@ public final class AutoSellManager {
 	/**
 	 * A sell GUI response is only accepted within this many ticks after the command
 	 * when the title check is disabled; a container screen appearing later is presumed
-	 * opened by the player and must not be hijacked. High ping commonly delays the
-	 * server's GUI by well over a second, so the window is generous. With the title
-	 * check enabled the exact title settles the question and the full timeout is
-	 * accepted.
+	 * opened by the player and must never be hijacked (chest/barrel screens share the
+	 * GenericContainerScreenHandler type, so type alone cannot prove provenance — only
+	 * the exact title can). With the title check enabled the title settles the
+	 * question, and the full command timeout is accepted so high ping gets its
+	 * generous window there.
 	 */
-	private static final int OPEN_ACCEPT_WINDOW_TICKS = 60;
-	private static final int RETRY_COOLDOWN_TICKS = 100;
+	private static final int OPEN_ACCEPT_WINDOW_TICKS = 20;
 	/** Cooldown after the sell GUI vanished (closed or replaced) mid-cycle. */
 	private static final int GUI_CLOSED_RETRY_COOLDOWN_TICKS = 40;
 	private static final int MIN_TRANSFER_STALL_TICKS = 30;
@@ -114,6 +114,12 @@ public final class AutoSellManager {
 	 * a full second or more on a high-ping connection.
 	 */
 	private static final int BUTTON_GRACE_TICKS = 20;
+	/**
+	 * Minimum ticks between full error logs and user-visible recovery messages when
+	 * the catch-all trips repeatedly — a persistently throwing path must not flood
+	 * the log or the action bar at 20 Hz while the client keeps running.
+	 */
+	private static final int ERROR_FEEDBACK_THROTTLE_TICKS = 600;
 
 	private enum State {
 		IDLE, COOLDOWN, OPENING, TRANSFERRING, WAIT_REOPEN, WAIT_CYCLE
@@ -158,6 +164,8 @@ public final class AutoSellManager {
 	private Screen keptOpenScreen;
 	/** Tracks world presence so a resumed session can be acknowledged once. */
 	private boolean wasInWorld;
+	/** Ticks remaining before the catch-all may log/notify again (error throttle). */
+	private int errorFeedbackCooldown;
 
 	private AutoSellManager() {
 	}
@@ -190,13 +198,24 @@ public final class AutoSellManager {
 	}
 
 	public void tick(MinecraftClient client) {
+		if (errorFeedbackCooldown > 0) {
+			errorFeedbackCooldown--;
+		}
 		try {
 			tickStateMachine(client);
 		} catch (Throwable t) {
 			// Nothing inside the state machine may ever take the client down. Reset
-			// the cycle, log, and keep selling on later ticks.
-			LOGGER.error("Unexpected error in the auto-sell state machine; resetting the cycle", t);
-			safeRecover(client);
+			// the cycle, log, and keep selling on later ticks. A persistently
+			// throwing path is throttled so the log and the action bar are not
+			// flooded at 20 Hz; the state reset itself always runs.
+			boolean notify = errorFeedbackCooldown <= 0;
+			if (notify) {
+				errorFeedbackCooldown = ERROR_FEEDBACK_THROTTLE_TICKS;
+				LOGGER.error("Unexpected error in the auto-sell state machine; resetting the cycle", t);
+			} else {
+				LOGGER.debug("Recurring auto-sell state machine error (throttled)", t);
+			}
+			safeRecover(client, notify);
 		}
 	}
 
@@ -311,10 +330,11 @@ public final class AutoSellManager {
 	}
 
 	/**
-	 * How long after the command a container screen is still accepted as the sell GUI:
-	 * the exact-title check settles the question on its own, so high ping gets the
-	 * full timeout; without it the (generous) fixed window keeps player-opened chests
-	 * out of reach.
+	 * How long after the command a container screen is still accepted as the sell GUI.
+	 * Without the title check, container type cannot prove provenance (chests and
+	 * barrels use the same handler), so the window stays tight: a screen appearing
+	 * later is presumed player-opened and is never hijacked. With the exact-title
+	 * check the title itself is the proof, so high ping gets the full timeout.
 	 */
 	private int acceptWindowTicks() {
 		return config.isGuiTitleCheckEnabled() ? OPEN_GUI_TIMEOUT_TICKS : OPEN_ACCEPT_WINDOW_TICKS;
@@ -669,6 +689,11 @@ public final class AutoSellManager {
 		sellButtonRetries = 0;
 		buttonClickPending = false;
 		buttonGraceTicks = 0;
+		buttonFailedThisWait = false;
+		// The interrupted cycle's measurements belong to the old GUI instance; the
+		// reopened GUI starts with a clean slate.
+		cursorReturnTicks = 0;
+		rejectedCycles = 0;
 		state = State.COOLDOWN;
 		timer = GUI_CLOSED_RETRY_COOLDOWN_TICKS;
 		feedback(client, Text.translatable("bytesautosell.msg.gui_closed_retry"));
@@ -678,26 +703,29 @@ public final class AutoSellManager {
 	 * Last-resort recovery after an unexpected throwable: reset the cycle (the toggle
 	 * and the enabled state are preserved) and, when it is provably safe, close the
 	 * sell GUI this mod was working (empty cursor) so the player is not left inside a
-	 * half-worked screen. Never throws.
+	 * half-worked screen. Never throws — the whole body is guarded so the catch-all
+	 * itself cannot be defeated.
 	 */
-	private void safeRecover(MinecraftClient client) {
-		Screen screen = client.currentScreen;
-		boolean ours = screen != null && screen == keptOpenScreen;
-		boolean cursorLoaded = false;
-		if (screen instanceof HandledScreen<?> handled && handled.getScreenHandler() != null) {
-			cursorLoaded = !handled.getScreenHandler().getCursorStack().isEmpty();
-		}
-		resetState();
+	private void safeRecover(MinecraftClient client, boolean notify) {
 		try {
+			Screen screen = client.currentScreen;
+			boolean ours = screen != null && screen == keptOpenScreen;
+			boolean cursorLoaded = false;
+			if (screen instanceof HandledScreen<?> handled && handled.getScreenHandler() != null) {
+				cursorLoaded = !handled.getScreenHandler().getCursorStack().isEmpty();
+			}
+			resetState();
 			if (ours && !cursorLoaded && client.player != null) {
 				// Only ever the mod's own accepted screen, and only with an empty
 				// cursor — a foreign screen is left exactly as the player opened it.
 				client.player.closeHandledScreen();
 			}
+			if (notify) {
+				feedback(client, Text.translatable("bytesautosell.msg.unexpected_error"));
+			}
 		} catch (Throwable closeError) {
-			LOGGER.error("Failed to close the sell GUI during recovery", closeError);
+			LOGGER.error("Recovery after an unexpected auto-sell error failed", closeError);
 		}
-		feedback(client, Text.translatable("bytesautosell.msg.unexpected_error"));
 	}
 
 	private boolean hasSellableItems(MinecraftClient client) {
