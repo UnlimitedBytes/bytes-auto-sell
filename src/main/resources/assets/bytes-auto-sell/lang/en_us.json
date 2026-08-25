@@ -16,6 +16,8 @@
 	"bytesautosell.msg.unexpected_error": "Auto Sell: unexpected error - recovered and continuing (see the log)",
 	"bytesautosell.msg.resumed": "Auto Sell: connected - resuming",
 	"bytesautosell.msg.button_slot_clamped": "Auto Sell: button slot %d is outside this GUI, using slot %d instead",
+	"bytesautosell.msg.update_available": "Bytes Auto Sell %s is available - you are running an older version.",
+	"bytesautosell.msg.update_link": "Click here to open the release page.",
 
 	"bytesautosell.on": "ON",
 	"bytesautosell.off": "OFF",
@@ -24,6 +26,7 @@
 	"bytesautosell.config.tab.selling": "Selling",
 	"bytesautosell.config.tab.timing": "Timing",
 	"bytesautosell.config.tab.guicheck": "GUI Check",
+	"bytesautosell.config.tab.updates": "Updates",
 
 	"bytesautosell.config.sell_command": "Sell Command",
 	"bytesautosell.config.sell_command.tooltip": "Command that opens the server's sell GUI, with or without the leading slash.",
@@ -45,6 +48,8 @@
 	"bytesautosell.config.title_check.tooltip": "Only interact with a GUI whose title exactly matches the expected title. Recommended on servers with other chest GUIs.",
 	"bytesautosell.config.expected_title": "Expected GUI Title",
 	"bytesautosell.config.expected_title.tooltip": "Exact title the sell GUI must have when the check is enabled. A blank title matches nothing.",
+	"bytesautosell.config.update_check": "Check for Updates on Join",
+	"bytesautosell.config.update_check.tooltip": "On server join, asks GitHub once whether a newer release exists and shows a chat message with a link if so. This is the mod's only network traffic besides the Minecraft connection; disable it here if you prefer.",
 
 	"bytesautosell.sell_mode.close_gui": "Close GUI",
 	"bytesautosell.sell_mode.keep_open": "Keep Open",

@@ -38,7 +38,7 @@ public final class AutoSellConfigScreen {
 				.setSaveConsumer(config::setSellCommand)
 				.build());
 		selling.addEntry(entries.startEnumSelector(Text.translatable("bytesautosell.config.sell_mode"), SellMode.class, config.getSellMode())
-				.setDefaultValue(SellMode.CLOSE_GUI)
+				.setDefaultValue(AutoSellConfig.DEFAULT_SELL_MODE)
 				.setEnumNameProvider(mode -> Text.translatable(((SellMode) mode).translationKey()))
 				.setTooltip(Text.translatable("bytesautosell.config.sell_mode.tooltip"))
 				.setSaveConsumer(config::setSellMode)
@@ -93,6 +93,14 @@ public final class AutoSellConfigScreen {
 				.setDefaultValue("")
 				.setTooltip(Text.translatable("bytesautosell.config.expected_title.tooltip"))
 				.setSaveConsumer(config::setExpectedGuiTitle)
+				.build());
+
+		ConfigCategory updates = builder.getOrCreateCategory(Text.translatable("bytesautosell.config.tab.updates"));
+		updates.addEntry(entries.startBooleanToggle(Text.translatable("bytesautosell.config.update_check"), config.isUpdateCheckEnabled())
+				.setDefaultValue(AutoSellConfig.DEFAULT_UPDATE_CHECK)
+				.setYesNoTextSupplier(value -> Text.translatable(value ? "bytesautosell.on" : "bytesautosell.off"))
+				.setTooltip(Text.translatable("bytesautosell.config.update_check.tooltip"))
+				.setSaveConsumer(config::setUpdateCheckEnabled)
 				.build());
 
 		return builder.build();
