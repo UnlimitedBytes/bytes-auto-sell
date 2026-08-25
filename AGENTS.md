@@ -28,6 +28,7 @@ src/main/java/ovh/unlimitedbytes/autosell/
     keybind/ModKeybinds.java     # keybind registration
     sell/AutoSellManager.java    # the auto-sell state machine (core of the mod)
     sell/TransferScheduler.java  # transfer delay + optional randomization
+    sell/RetryBackoff.java       # capped exponential backoff for start retries
     util/CommandUtil.java        # sell-command normalization (pure, unit-tested)
     util/TitleMatcher.java       # GUI title check (pure, unit-tested)
     ui/AutoSellConfigScreen.java # in-game settings screen

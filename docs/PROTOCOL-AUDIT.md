@@ -12,13 +12,14 @@ during the port review).
 
 ## Egress inventory
 
-The mod has exactly **three** code sites that cause network traffic:
+The mod has exactly **three** kinds of code site that cause network traffic — one
+command site, one centralized click helper, and three close sites:
 
 | # | Site (yarn / 1.21.11) | Vanilla equivalent a player triggers |
 |---|---|---|
 | 1 | `AutoSellManager.startCycle` → `networkHandler.sendChatCommand(cmd)` | Typing `/sell` in chat and pressing Enter |
-| 2 | `AutoSellManager.click` → `interactionManager.clickSlot(syncId, slot, button, type, player)` | Left-clicking / shift-clicking a slot in a container GUI |
-| 3 | `AutoSellManager.finishDeposit` → `player.closeHandledScreen()` | Closing a container GUI (E / Esc) |
+| 2 | `AutoSellManager.click` → `interactionManager.clickSlot(syncId, slot, button, type, player)` (every slot click in the mod funnels through this one helper) | Left-clicking / shift-clicking a slot in a container GUI |
+| 3 | `player.closeHandledScreen()` — at `finishDeposit` (Close GUI mode), at the GUI-full/button flush recovery, and at `safeRecover` (after an unexpected error, own screen only, empty cursor only) | Closing a container GUI (E / Esc) |
 
 Everything else in the mod (GUI title check, inventory reads, timing, config I/O,
 keybinds, the settings screen, action-bar feedback) is client-local and sends nothing.
@@ -95,8 +96,9 @@ client-side overlay/action-bar display. Mojmap (26.x): `sendOverlayMessage(Compo
 Packet **contents** are always identical. Packet **inter-arrival timing** is not:
 a human emits at most a handful of clicks per second, while the mod can emit up to
 `transferBurst` quick-moves — or `2 × transferBurst` pickup/place clicks — per
-`transferDelayTicks`. With the defaults (1 stack/tick) that is up to 20–40 click
-packets per second, which is above sustained human click rates.
+`transferDelayTicks`. With the defaults (burst 10, delay 1) that is up to ~100–200
+click packets per second while items actually move, which is far above sustained
+human click rates.
 
 This is inherent to any automation and addressable by configuration, not by protocol:
 raise *Item Transfer Speed*, lower *Transfer Burst*, and enable *Randomize Transfer
@@ -108,5 +110,6 @@ plugins) could, which is what the timing settings exist for.
 
 Rule for all future changes (also an invariant in AGENTS.md): the mod must only cause
 network traffic through the vanilla client methods listed above — `sendChatCommand`
-(`sendCommand`), `clickSlot` (`click`), `closeHandledScreen` (`closeContainer`) — and
-must never construct, modify, or schedule raw packets itself.
+(`sendCommand`), `clickSlot` (`handleContainerInput`), `closeHandledScreen`
+(`closeContainer`) — and must never construct, modify, or schedule raw packets
+itself.
