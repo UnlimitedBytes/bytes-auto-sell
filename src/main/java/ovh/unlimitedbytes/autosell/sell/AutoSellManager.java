@@ -39,9 +39,9 @@ import java.util.Set;
  * Never-fail policy: while connected to a server the mod never disables itself and
  * never crashes the client. Failed cycle starts (no GUI / empty command) retry forever
  * with a capped exponential backoff (see {@link RetryBackoff}). A sell GUI that closes
- * or is replaced while being worked triggers a short cooldown and a fresh cycle — with
- * no screen open the toggle keybind works, so the player always retains control in the
- * gap. A sell GUI that repeatedly accepts nothing (typically: it is full) is never
+ * or is replaced while being worked triggers a short cooldown and a fresh cycle — the
+ * toggle keybind works inside screens too (except during text entry), so the player
+ * always retains control. A sell GUI that repeatedly accepts nothing (typically: it is full) is never
  * fatal either: Keep Open mode grants the configured sell button extra clicks and then
  * closes and reopens the GUI (on servers that sell a chest's contents on close this
  * flushes it), and Close GUI mode keeps cycling since every reopen starts fresh. A
@@ -158,8 +158,10 @@ public final class AutoSellManager {
 	 * The exact screen instance this mod accepted as the sell GUI (from the command
 	 * response) or kept open (Keep Open mode). Only this instance is ever interacted
 	 * with again — a container screen the player opened later is a different object
-	 * and must never be touched, even with the title check disabled. If that screen
-	 * disappears the cycle recovers (close + retry) rather than disabling.
+	 * and must never be touched, even with the title check disabled. A toggle
+	 * preserves the provenance while that exact screen stays open (so re-enabling
+	 * inside it resumes selling); once it is closed the provenance is gone and a
+	 * later container is never adopted.
 	 */
 	private Screen keptOpenScreen;
 	/** Tracks world presence so a resumed session can be acknowledged once. */
@@ -175,8 +177,15 @@ public final class AutoSellManager {
 	}
 
 	public void toggle(MinecraftClient client) {
+		// Preserve the sell GUI's provenance across the toggle while that exact
+		// screen instance is still open: toggling off and back on inside the sell
+		// GUI then resumes selling in it instead of idling until it is closed.
+		// Identity decides — a different screen the player opened later is never
+		// adopted, and once the GUI is closed the provenance is gone for good.
+		Screen openSellGui = client.currentScreen == keptOpenScreen ? keptOpenScreen : null;
 		enabled = !enabled;
 		resetState();
+		keptOpenScreen = openSellGui;
 		if (client.player != null) {
 			client.player.sendMessage(Text.translatable(enabled
 					? "bytesautosell.msg.enabled"
