@@ -37,7 +37,7 @@ human input; use the transfer speed/burst/randomize settings for a human-like ca
 | Keybind (vanilla Controls menu) | Default | Action |
 |---|---|---|
 | Open Settings | `O` | Opens the Bytes Auto Sell settings screen |
-| Toggle Auto Sell | `K` | Enables/disables auto-selling (action bar feedback) |
+| Toggle Auto Sell | `K` | Enables/disables auto-selling — works everywhere, including inside the sell GUI (not while typing in a text field) |
 
 While enabled, the mod polls your inventory. It keeps its enabled state across
 disconnects and resumes automatically on the next server join (press `K` to stop it —

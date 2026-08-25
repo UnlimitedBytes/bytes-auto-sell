@@ -160,8 +160,9 @@ The reviewer acts as a senior Minecraft/Fabric engineer with **zero tolerance**:
 4. **Fail resilient — never crash, never give up.** While connected, the mod never
    disables itself and never crashes the client. The sell GUI closing or being
    replaced while the mod is working it triggers a short cooldown and a fresh cycle
-   (with no screen open the toggle keybind works, so the player can always stop the
-   mod in the gap; while any other screen is open the mod sends nothing). Failed
+   (the toggle keybind works inside screens too — intercepted via Fabric screen
+   events, except while a text field is focused — so the player can always stop the
+   mod; while any other screen is open the mod sends nothing). Failed
    cycle starts (GUI did not open) retry forever with a capped exponential backoff
    (see `RetryBackoff`). A sell GUI that repeatedly accepts nothing (e.g. it is full)
    triggers recovery: in Keep Open mode the mod retries the configured sell button up
