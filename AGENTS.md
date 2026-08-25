@@ -139,23 +139,32 @@ The reviewer acts as a senior Minecraft/Fabric engineer with **zero tolerance**:
 ## Safety Invariants (never break these)
 
 1. **Never drop items.** Never close a GUI or click a sell button while the cursor holds
-   an item (vanilla would drop it). Return the cursor stack first; if impossible, abort
-   the cycle and leave the GUI open.
+   an item (vanilla would drop it). Return the cursor stack first (or park it in an
+   empty sell-GUI slot when the inventory is full); if impossible, keep retrying and
+   leave the GUI open.
 2. **Only touch the sell GUI.** Interact only with `GenericContainerScreenHandler` screens
    (`ChestMenu` on 26.x), and only when the (optional) GUI title check passes. A blank
    expected title with the check enabled matches nothing, never everything.
 3. **Never sell armor or offhand.** Only the 36 main inventory + hotbar slots are moved.
-4. **Fail safe.** The sell GUI closing or being replaced while the mod is working it
-   disables auto-sell immediately (keybinds are unusable while a screen is open, so
-   silently continuing would lock the player out of stopping it; player and server
-   closes are treated the same way). Timeouts reset the state machine to IDLE with a
-   cooldown and re-sync with reality before acting again. Repeated failed starts
-   disable auto-sell with a message instead of looping forever. A sell GUI that
-   repeatedly accepts nothing (e.g. it is full) never disables auto-sell: in Keep
-   Open mode the mod retries the configured sell button up to three times and then
-   closes and reopens the GUI (on servers that sell on close this flushes the
-   contents), and in Close GUI mode it keeps cycling since every reopen starts
-   fresh — a stopped bot loses more than a retry. A disconnect always turns it off.
+4. **Fail resilient — never crash, never give up.** While connected, the mod never
+   disables itself and never crashes the client. The sell GUI closing or being
+   replaced while the mod is working it triggers a short cooldown and a fresh cycle
+   (with no screen open the toggle keybind works, so the player can always stop the
+   mod in the gap; while any other screen is open the mod sends nothing). Failed
+   cycle starts (GUI did not open) retry forever with a capped exponential backoff
+   (see `RetryBackoff`). A sell GUI that repeatedly accepts nothing (e.g. it is full)
+   triggers recovery: in Keep Open mode the mod retries the configured sell button up
+   to three times and then closes and reopens the GUI (on servers that sell on close
+   this flushes the contents), and in Close GUI mode it keeps cycling since every
+   reopen starts fresh. A sell button that only picks stacks up escalates to the same
+   close-and-reopen recovery. A cursor stack that cannot be returned is parked in an
+   empty sell-GUI slot (sold with the rest) or, if nothing is free anywhere, retried
+   until a slot frees — the GUI is never closed while the cursor holds an item.
+   Every slot click is bounds- and null-checked before it reaches vanilla (the local
+   click prediction indexes the slot list directly and would otherwise crash), and
+   the whole tick is wrapped in a catch-all that resets the cycle, logs, and
+   continues on any unexpected throwable. A disconnect resets the cycle but
+   preserves the toggle; selling resumes on the next server join.
 5. **Protocol legitimacy** (see docs/PROTOCOL-AUDIT.md). All network traffic must go
    through the vanilla client methods — `sendChatCommand` (`sendCommand` on 26.x),
    `clickSlot` (`handleContainerInput` on 26.x), `closeHandledScreen` (`closeContainer`)

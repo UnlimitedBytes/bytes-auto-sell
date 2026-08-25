@@ -39,8 +39,9 @@ human input; use the transfer speed/burst/randomize settings for a human-like ca
 | Open Settings | `O` | Opens the Bytes Auto Sell settings screen |
 | Toggle Auto Sell | `K` | Enables/disables auto-selling (action bar feedback) |
 
-While enabled, the mod polls your inventory (the toggle turns itself off whenever you
-leave a server — re-enable it with `K` after joining). When it contains items it:
+While enabled, the mod polls your inventory. It keeps its enabled state across
+disconnects and resumes automatically on the next server join (press `K` to stop it —
+it stays off until you toggle it again). When your inventory contains items it:
 
 1. Runs the configured sell command (default `/sell`) — the server opens its sell GUI.
 2. Moves all hotbar + main inventory stacks (never armor/offhand) into the GUI using
@@ -72,6 +73,26 @@ All settings are available in-game (`O` keybind, or via Mod Menu) and stored in
 **Tip:** with the GUI Title Check disabled, the mod will treat *any* chest-like GUI
 that appears right after the sell command as the sell GUI. On servers with other
 chest GUIs, enable the check and set the exact sell GUI title.
+
+## Reliability
+
+The mod is built to never crash and never give up, including on high-ping connections:
+
+- **It never disables itself while connected.** A sell GUI that fails to open is
+  retried with a capped backoff (5 s → 10 s → 20 s → 30 s); a GUI that closes or is
+  replaced mid-cycle is retried after a short cooldown; a full GUI is flushed by
+  closing and reopening; a sell button that only picks items up escalates to the same
+  reopen recovery.
+- **It never drops items.** The cursor stack is always returned (or parked in the
+  sell GUI when the inventory is full) before any close or button click; if nothing
+  is free anywhere — possible while the server still owes confirmations — the mod
+  waits and retries instead of ever closing with a loaded cursor.
+- **It never crashes the client.** Every slot click is bounds- and null-checked, and
+  the whole state machine is wrapped in a catch-all that resets the current cycle,
+  logs, and continues if some unexpected vanilla interaction ever throws.
+- High ping is specifically tolerated: the sell GUI may take up to the full 5 s
+  window to appear (the whole window when the title check is on), and button clicks
+  get a full second of grace before a loaded cursor is treated as a real pickup.
 
 ## Building
 
