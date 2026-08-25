@@ -114,7 +114,11 @@ public final class AutoSellConfig {
 		this.keepOpenButtonSlot = other.keepOpenButtonSlot;
 	}
 
-	/** Clamps every value into its valid range and restores defaults for missing fields. */
+	/**
+	 * Clamps every value into its valid range. Null or blank string/enum fields
+	 * restore their defaults; numeric fields absent from the JSON deserialize as 0
+	 * and clamp to the range minimum.
+	 */
 	public void sanitize() {
 		if (sellCommand == null || sellCommand.isBlank()) {
 			sellCommand = DEFAULT_SELL_COMMAND;
