@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/logo.png" alt="Bytes Auto Sell logo" width="320">
+</p>
+
 # Bytes Auto Sell
 
 A client-side Fabric mod that automatically sells your inventory through your server's
