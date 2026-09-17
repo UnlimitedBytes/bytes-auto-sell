@@ -12,6 +12,8 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Client configuration, persisted as JSON in the config directory.
@@ -26,6 +28,16 @@ public final class AutoSellConfig {
 	public static final SellMode DEFAULT_SELL_MODE = SellMode.KEEP_OPEN;
 	/** Update check default; see {@link ovh.unlimitedbytes.autosell.update.UpdateChecker}. */
 	public static final boolean DEFAULT_UPDATE_CHECK = true;
+	/** Default "Use Allowlist" state: restricted selling is on out of the box. */
+	public static final boolean DEFAULT_USE_ALLOWLIST = true;
+	/** The only items sold out of the box. */
+	public static final List<String> DEFAULT_ALLOWLIST = List.of(
+			"minecraft:dandelion",
+			"minecraft:poppy",
+			"minecraft:pumpkin",
+			"minecraft:melon_seeds",
+			"minecraft:melon_slice");
+	public static final int MAX_ALLOWLIST_ENTRIES = 1024;
 	public static final int DEFAULT_TRANSFER_DELAY_TICKS = 1;
 	public static final int DEFAULT_TRANSFER_BURST = 10;
 	public static final int DEFAULT_REOPEN_DELAY_TICKS = 20;
@@ -58,6 +70,10 @@ public final class AutoSellConfig {
 	private int keepOpenButtonSlot = DEFAULT_BUTTON_SLOT;
 	/** Whether the GitHub update check runs on server join. */
 	private boolean updateCheckEnabled = DEFAULT_UPDATE_CHECK;
+	/** Whether only allowlisted items are sold (see {@link #allowlist}). */
+	private boolean useAllowlist = DEFAULT_USE_ALLOWLIST;
+	/** Item ids (e.g. "minecraft:poppy") the mod may sell when the allowlist is enabled. */
+	private List<String> allowlist = new ArrayList<>(DEFAULT_ALLOWLIST);
 
 	public static AutoSellConfig get() {
 		return instance;
@@ -118,6 +134,10 @@ public final class AutoSellConfig {
 		this.expectedGuiTitle = other.expectedGuiTitle;
 		this.keepOpenButtonSlot = other.keepOpenButtonSlot;
 		this.updateCheckEnabled = other.updateCheckEnabled;
+		this.useAllowlist = other.useAllowlist;
+		this.allowlist = other.allowlist == null
+				? new ArrayList<>(DEFAULT_ALLOWLIST)
+				: new ArrayList<>(other.allowlist);
 	}
 
 	/**
@@ -144,6 +164,23 @@ public final class AutoSellConfig {
 		transferBurst = clamp(transferBurst, MIN_TRANSFER_BURST, MAX_TRANSFER_BURST);
 		reopenDelayTicks = clamp(reopenDelayTicks, MIN_REOPEN_DELAY_TICKS, MAX_REOPEN_DELAY_TICKS);
 		keepOpenButtonSlot = clamp(keepOpenButtonSlot, MIN_BUTTON_SLOT, MAX_BUTTON_SLOT);
+		if (allowlist == null) {
+			allowlist = new ArrayList<>(DEFAULT_ALLOWLIST);
+		}
+		List<String> cleaned = new ArrayList<>();
+		for (String id : allowlist) {
+			if (id == null) {
+				continue;
+			}
+			String trimmed = truncate(id).trim();
+			if (!trimmed.isEmpty() && !cleaned.contains(trimmed)) {
+				cleaned.add(trimmed);
+			}
+			if (cleaned.size() >= MAX_ALLOWLIST_ENTRIES) {
+				break;
+			}
+		}
+		allowlist = cleaned;
 	}
 
 	private static int clamp(int value, int min, int max) {
@@ -240,5 +277,23 @@ public final class AutoSellConfig {
 
 	public void setUpdateCheckEnabled(boolean updateCheckEnabled) {
 		this.updateCheckEnabled = updateCheckEnabled;
+	}
+
+	public boolean isUseAllowlist() {
+		return useAllowlist;
+	}
+
+	public void setUseAllowlist(boolean useAllowlist) {
+		this.useAllowlist = useAllowlist;
+	}
+
+	/** Unmodifiable snapshot; mutate via {@link #setAllowList(List)}. */
+	public List<String> getAllowList() {
+		return List.copyOf(allowlist);
+	}
+
+	public void setAllowList(List<String> allowlist) {
+		this.allowlist = allowlist != null ? new ArrayList<>(allowlist) : new ArrayList<>(DEFAULT_ALLOWLIST);
+		sanitize();
 	}
 }
