@@ -8,6 +8,8 @@ import ovh.unlimitedbytes.autosell.util.TitleMatcher;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.inventory.ChestMenu;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerInput;
@@ -742,11 +744,25 @@ public final class AutoSellManager {
 
 	private boolean hasSellableItems(Minecraft client) {
 		for (int i = 0; i < PLAYER_SLOTS; i++) {
-			if (!client.player.getInventory().getItem(i).isEmpty()) {
+			if (isSellable(client.player.getInventory().getItem(i))) {
 				return true;
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Whether this stack may be sold: everything is sellable unless the allowlist
+	 * is enabled, in which case only its item ids are.
+	 */
+	private boolean isSellable(ItemStack stack) {
+		if (stack.isEmpty()) {
+			return false;
+		}
+		if (!config.isUseAllowlist()) {
+			return true;
+		}
+		return config.isAllowListed(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString());
 	}
 
 	private boolean isSellGui(Screen screen) {
@@ -768,20 +784,20 @@ public final class AutoSellManager {
 		return null;
 	}
 
-	private static int countPlayerItems(ChestMenu menu, int containerSlots) {
+	private int countPlayerItems(ChestMenu menu, int containerSlots) {
 		int count = 0;
 		for (int i = 0; i < PLAYER_SLOTS; i++) {
-			if (!menu.getSlot(containerSlots + i).getItem().isEmpty()) {
+			if (isSellable(menu.getSlot(containerSlots + i).getItem())) {
 				count++;
 			}
 		}
 		return count;
 	}
 
-	private static int findPlayerStackSlot(ChestMenu menu, int containerSlots, Set<Integer> exclude) {
+	private int findPlayerStackSlot(ChestMenu menu, int containerSlots, Set<Integer> exclude) {
 		for (int i = 0; i < PLAYER_SLOTS; i++) {
 			int slot = containerSlots + i;
-			if (!exclude.contains(slot) && !menu.getSlot(slot).getItem().isEmpty()) {
+			if (!exclude.contains(slot) && isSellable(menu.getSlot(slot).getItem())) {
 				return slot;
 			}
 		}
