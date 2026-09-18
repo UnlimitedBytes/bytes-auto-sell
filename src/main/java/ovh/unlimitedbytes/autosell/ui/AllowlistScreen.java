@@ -41,6 +41,7 @@ public final class AllowlistScreen extends Screen {
 	private static final int COLOR_ROW_HOVER = 0x30FFFFFF;
 	private static final int COLOR_BOX_ON = 0xFF2FBF4F;
 	private static final int COLOR_BOX_OFF = 0xFF606068;
+	private static final int COLOR_CHECK = 0xFFF3FFF6;
 	private static final int COLOR_NAME_ON = 0xFFFFFFFF;
 	private static final int COLOR_NAME_OFF = 0xFF9A9AA0;
 	private static final int COLOR_ID = 0xFF707078;
@@ -224,9 +225,12 @@ public final class AllowlistScreen extends Screen {
 			int boxY = rowY + (ROW_HEIGHT - 10) / 2;
 			if (isSelected) {
 				context.fill(boxX, boxY, boxX + 10, boxY + 10, COLOR_BOX_ON);
-				// crisp check mark: two dark bars
-				context.fill(boxX + 2, boxY + 5, boxX + 4, boxY + 8, 0xFF0E2A14);
-				context.fill(boxX + 4, boxY + 4, boxX + 8, boxY + 7, 0xFF0E2A14);
+				// pixel-art check: four 2x2 steps, down then up (renders as a
+				// crisp mark at every GUI scale, unlike drawn bars)
+				context.fill(boxX + 2, boxY + 5, boxX + 4, boxY + 7, COLOR_CHECK);
+				context.fill(boxX + 4, boxY + 7, boxX + 6, boxY + 9, COLOR_CHECK);
+				context.fill(boxX + 6, boxY + 5, boxX + 8, boxY + 7, COLOR_CHECK);
+				context.fill(boxX + 8, boxY + 3, boxX + 10, boxY + 5, COLOR_CHECK);
 			} else {
 				context.fill(boxX, boxY, boxX + 10, boxY + 1, COLOR_BOX_OFF);
 				context.fill(boxX, boxY + 9, boxX + 10, boxY + 10, COLOR_BOX_OFF);
