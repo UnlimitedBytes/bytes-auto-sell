@@ -127,7 +127,7 @@ public final class AllowlistScreen extends Screen {
 		lastPanelLeft = left;
 		lastPanelRight = left + PANEL_WIDTH;
 		lastPanelTop = 52;
-		lastPanelBottom = height - 34;
+		lastPanelBottom = height - 46;
 	}
 
 	private void recomputeVisible() {
@@ -180,11 +180,14 @@ public final class AllowlistScreen extends Screen {
 	@Override
 	public void render(DrawContext context, int mouseX, int mouseY, float delta) {
 		super.render(context, mouseX, mouseY, delta);
+		// addSelectableChild registers the box for input focus only, not drawing —
+		// without this call neither the box nor the typed text shows up.
+		searchBox.render(context, mouseX, mouseY, delta);
 
 		int left = width / 2 - PANEL_WIDTH / 2;
 		int right = left + PANEL_WIDTH;
 		int top = 52;
-		int bottom = height - 34;
+		int bottom = height - 46;
 		lastPanelTop = top;
 		lastPanelBottom = bottom;
 		lastPanelLeft = left;
@@ -251,11 +254,13 @@ public final class AllowlistScreen extends Screen {
 					draggingScrollbar ? 0xFF8A8A96 : 0xFF5A5A66);
 		}
 
-		String counter = Text.translatable("bytesautosell.allowlist.selected", selected.size()).getString();
-		context.drawText(textRenderer, counter, right - textRenderer.getWidth(counter) - 4, 34, COLOR_NAME_ON, true);
-		context.drawText(textRenderer,
-				Text.translatable("bytesautosell.allowlist.shown", visible.size(), allItems.size()).getString(),
-				left + 4, height - 44, COLOR_ID, false);
+		// The counters live in the strip between the panel and the buttons so they
+		// can never overlap the list rows or the All/None buttons.
+		Text shown = Text.translatable("bytesautosell.allowlist.shown", visible.size(), allItems.size());
+		context.drawText(textRenderer, shown, left + 2, height - 40, COLOR_ID, false);
+		Text counter = Text.translatable("bytesautosell.allowlist.selected", selected.size());
+		context.drawText(textRenderer, counter, right - textRenderer.getWidth(counter) - 2, height - 40,
+				selected.isEmpty() ? COLOR_ID : COLOR_NAME_ON, true);
 
 		if (query.isEmpty() && getFocused() != searchBox) {
 			context.drawText(textRenderer, Text.translatable("bytesautosell.allowlist.search").getString(),
