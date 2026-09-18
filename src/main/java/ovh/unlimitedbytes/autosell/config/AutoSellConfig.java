@@ -13,7 +13,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Client configuration, persisted as JSON in the config directory.
@@ -74,6 +76,8 @@ public final class AutoSellConfig {
 	private boolean useAllowlist = DEFAULT_USE_ALLOWLIST;
 	/** Item ids (e.g. "minecraft:poppy") the mod may sell when the allowlist is enabled. */
 	private List<String> allowlist = new ArrayList<>(DEFAULT_ALLOWLIST);
+	/** Fast membership index over {@link #allowlist}; rebuilt whenever the list changes. */
+	private Set<String> allowListIndex = new HashSet<>(DEFAULT_ALLOWLIST);
 
 	public static AutoSellConfig get() {
 		return instance;
@@ -138,6 +142,7 @@ public final class AutoSellConfig {
 		this.allowlist = other.allowlist == null
 				? new ArrayList<>(DEFAULT_ALLOWLIST)
 				: new ArrayList<>(other.allowlist);
+		rebuildAllowListIndex();
 	}
 
 	/**
@@ -181,6 +186,16 @@ public final class AutoSellConfig {
 			}
 		}
 		allowlist = cleaned;
+		rebuildAllowListIndex();
+	}
+
+	private void rebuildAllowListIndex() {
+		allowListIndex = new HashSet<>(allowlist);
+	}
+
+	/** Fast allowlist membership check used per inventory stack; see {@link #getAllowList()}. */
+	public boolean isAllowListed(String itemId) {
+		return allowListIndex.contains(itemId);
 	}
 
 	private static int clamp(int value, int min, int max) {
@@ -295,5 +310,4 @@ public final class AutoSellConfig {
 	public void setAllowList(List<String> allowlist) {
 		this.allowlist = allowlist != null ? new ArrayList<>(allowlist) : new ArrayList<>(DEFAULT_ALLOWLIST);
 		sanitize();
-	}
-}
+	}}

@@ -759,7 +759,7 @@ public final class AutoSellManager {
 		if (!config.isUseAllowlist()) {
 			return true;
 		}
-		return config.getAllowList().contains(Registries.ITEM.getId(stack.getItem()).toString());
+		return config.isAllowListed(Registries.ITEM.getId(stack.getItem()).toString());
 	}
 
 	private boolean isSellGui(Screen screen) {

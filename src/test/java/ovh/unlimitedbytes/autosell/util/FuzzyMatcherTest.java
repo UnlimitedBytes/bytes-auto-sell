@@ -27,6 +27,10 @@ class FuzzyMatcherTest {
 	void caseInsensitive() {
 		assertTrue(FuzzyMatcher.isMatch("DANDELION", "minecraft:dandelion"));
 		assertTrue(FuzzyMatcher.isMatch("Poppy", "minecraft:poppy"));
+		// the target side is folded too: display names start uppercase
+		assertTrue(FuzzyMatcher.isMatch("poppy", "Poppy"));
+		assertTrue(FuzzyMatcher.isMatch("melon sed", "Melon Seeds"));
+		assertTrue(FuzzyMatcher.isMatch("silk", "Silk Touch"));
 	}
 
 	@Test

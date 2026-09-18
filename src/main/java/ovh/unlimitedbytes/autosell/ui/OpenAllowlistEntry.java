@@ -21,6 +21,13 @@ final class OpenAllowlistEntry extends AbstractConfigListEntry<Object> {
 	private static final int COLOR_LABEL = 0xFFF0F0F0;
 
 	private final Runnable onPress;
+	/**
+	 * Whether the entry was hovered at its last render. Cloth's list offers
+	 * clicks to every entry, visible or scrolled out, so this guards against a
+	 * stale (scrolled-out) button rect claiming a click after a scroll — at most
+	 * one frame old.
+	 */
+	private boolean renderedHovered;
 	private int buttonX;
 	private int buttonY;
 	private int buttonWidth;
@@ -32,12 +39,13 @@ final class OpenAllowlistEntry extends AbstractConfigListEntry<Object> {
 	}
 
 	@Override
-	public void render(DrawContext context, int index, int x, int width, int y, int height,
+	public void render(DrawContext context, int index, int y, int x, int entryWidth, int entryHeight,
 			int mouseX, int mouseY, boolean hovered, float delta) {
 		buttonX = x + 4;
 		buttonY = y + 2;
-		buttonWidth = Math.min(160, width - 8);
-		buttonHeight = Math.max(12, height - 4);
+		buttonWidth = Math.min(160, Math.max(0, entryWidth - 8));
+		buttonHeight = Math.max(12, entryHeight - 4);
+		renderedHovered = hovered;
 		boolean inside = mouseX >= buttonX && mouseX < buttonX + buttonWidth
 				&& mouseY >= buttonY && mouseY < buttonY + buttonHeight;
 		context.fill(buttonX, buttonY, buttonX + buttonWidth, buttonY + buttonHeight,
@@ -56,7 +64,7 @@ final class OpenAllowlistEntry extends AbstractConfigListEntry<Object> {
 
 	@Override
 	public boolean mouseClicked(net.minecraft.client.gui.Click click, boolean doubled) {
-		if (click.button() == 0 && click.x() >= buttonX && click.x() < buttonX + buttonWidth
+		if (renderedHovered && click.button() == 0 && click.x() >= buttonX && click.x() < buttonX + buttonWidth
 				&& click.y() >= buttonY && click.y() < buttonY + buttonHeight) {
 			onPress.run();
 			return true;

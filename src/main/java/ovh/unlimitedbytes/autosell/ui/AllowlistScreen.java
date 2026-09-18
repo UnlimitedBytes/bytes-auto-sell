@@ -99,6 +99,12 @@ public final class AllowlistScreen extends Screen {
 		});
 		addSelectableChild(searchBox);
 		setFocused(searchBox);
+		// init() re-runs on window resize and recreates the box empty; keep the
+		// filter state in sync so the list never shows results for invisible text.
+		if (!query.isEmpty()) {
+			query = "";
+			recomputeVisible();
+		}
 
 		allButton = addDrawableChild(ButtonWidget.builder(Text.translatable("bytesautosell.allowlist.all"),
 				button -> {
@@ -128,6 +134,8 @@ public final class AllowlistScreen extends Screen {
 	private void recomputeVisible() {
 		visible.clear();
 		visibleScores.clear();
+		// Search across the id path and the display name, whichever matches better;
+		// the raw full id is a weaker tiebreaker (it always contains the path).
 		for (ItemEntry entry : allItems) {
 			int score = Math.max(
 					FuzzyMatcher.scoreTokens(query, entry.path()),
@@ -152,6 +160,8 @@ public final class AllowlistScreen extends Screen {
 		}
 		visible.clear();
 		visible.addAll(sorted);
+		// scores were only needed for the ranking above
+		visibleScores.clear();
 	}
 
 	private void saveAndClose() {

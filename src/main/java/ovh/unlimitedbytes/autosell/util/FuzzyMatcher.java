@@ -31,9 +31,10 @@ public final class FuzzyMatcher {
 		if (normalized.isEmpty()) {
 			return 0;
 		}
+		String targetLower = target.toLowerCase(Locale.ROOT);
 		int total = 0;
 		for (String token : normalized.split("\\s+")) {
-			int score = score(token, target);
+			int score = score(token, targetLower);
 			if (score < 0) {
 				return -1;
 			}
