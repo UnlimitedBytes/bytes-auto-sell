@@ -8,6 +8,8 @@ import ovh.unlimitedbytes.autosell.util.TitleMatcher;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.screen.ingame.HandledScreen;
+import net.minecraft.item.ItemStack;
+import net.minecraft.registry.Registries;
 import net.minecraft.screen.GenericContainerScreenHandler;
 import net.minecraft.screen.ScreenHandler;
 import net.minecraft.screen.slot.SlotActionType;
@@ -739,11 +741,25 @@ public final class AutoSellManager {
 
 	private boolean hasSellableItems(MinecraftClient client) {
 		for (int i = 0; i < PLAYER_SLOTS; i++) {
-			if (!client.player.getInventory().getStack(i).isEmpty()) {
+			if (isSellable(client.player.getInventory().getStack(i))) {
 				return true;
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Whether this stack may be sold: everything is sellable unless the allowlist
+	 * is enabled, in which case only its item ids are.
+	 */
+	private boolean isSellable(ItemStack stack) {
+		if (stack.isEmpty()) {
+			return false;
+		}
+		if (!config.isUseAllowlist()) {
+			return true;
+		}
+		return config.isAllowListed(Registries.ITEM.getId(stack.getItem()).toString());
 	}
 
 	private boolean isSellGui(Screen screen) {
@@ -765,20 +781,20 @@ public final class AutoSellManager {
 		return null;
 	}
 
-	private static int countPlayerItems(GenericContainerScreenHandler handler, int containerSlots) {
+	private int countPlayerItems(GenericContainerScreenHandler handler, int containerSlots) {
 		int count = 0;
 		for (int i = 0; i < PLAYER_SLOTS; i++) {
-			if (!handler.getSlot(containerSlots + i).getStack().isEmpty()) {
+			if (isSellable(handler.getSlot(containerSlots + i).getStack())) {
 				count++;
 			}
 		}
 		return count;
 	}
 
-	private static int findPlayerStackSlot(GenericContainerScreenHandler handler, int containerSlots, Set<Integer> exclude) {
+	private int findPlayerStackSlot(GenericContainerScreenHandler handler, int containerSlots, Set<Integer> exclude) {
 		for (int i = 0; i < PLAYER_SLOTS; i++) {
 			int slot = containerSlots + i;
-			if (!exclude.contains(slot) && !handler.getSlot(slot).getStack().isEmpty()) {
+			if (!exclude.contains(slot) && isSellable(handler.getSlot(slot).getStack())) {
 				return slot;
 			}
 		}
