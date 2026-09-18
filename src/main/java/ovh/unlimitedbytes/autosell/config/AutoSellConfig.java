@@ -76,8 +76,8 @@ public final class AutoSellConfig {
 	private boolean useAllowlist = DEFAULT_USE_ALLOWLIST;
 	/** Item ids (e.g. "minecraft:poppy") the mod may sell when the allowlist is enabled. */
 	private List<String> allowlist = new ArrayList<>(DEFAULT_ALLOWLIST);
-	/** Fast membership index over {@link #allowlist}; rebuilt whenever the list changes. */
-	private Set<String> allowListIndex = new HashSet<>(DEFAULT_ALLOWLIST);
+	/** Fast membership index over {@link #allowlist}; rebuilt whenever the list changes. Never serialized. */
+	private transient Set<String> allowListIndex = new HashSet<>(DEFAULT_ALLOWLIST);
 
 	public static AutoSellConfig get() {
 		return instance;
@@ -310,4 +310,5 @@ public final class AutoSellConfig {
 	public void setAllowList(List<String> allowlist) {
 		this.allowlist = allowlist != null ? new ArrayList<>(allowlist) : new ArrayList<>(DEFAULT_ALLOWLIST);
 		sanitize();
-	}}
+	}
+}

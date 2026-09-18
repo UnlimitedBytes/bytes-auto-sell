@@ -52,7 +52,6 @@ public final class AllowlistScreen extends Screen {
 	private final Set<String> selected = new LinkedHashSet<>();
 	private final List<ItemEntry> allItems = new ArrayList<>();
 	private final List<ItemEntry> visible = new ArrayList<>();
-	private final List<Integer> visibleScores = new ArrayList<>();
 
 	private TextFieldWidget searchBox;
 	private ButtonWidget allButton;
@@ -133,7 +132,7 @@ public final class AllowlistScreen extends Screen {
 
 	private void recomputeVisible() {
 		visible.clear();
-		visibleScores.clear();
+		List<Integer> visibleScores = new ArrayList<>();
 		// Search across the id path and the display name, whichever matches better;
 		// the raw full id is a weaker tiebreaker (it always contains the path).
 		for (ItemEntry entry : allItems) {
@@ -160,8 +159,6 @@ public final class AllowlistScreen extends Screen {
 		}
 		visible.clear();
 		visible.addAll(sorted);
-		// scores were only needed for the ranking above
-		visibleScores.clear();
 	}
 
 	private void saveAndClose() {
