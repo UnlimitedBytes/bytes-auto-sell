@@ -76,6 +76,8 @@ All settings are available in-game (`O` keybind, or via Mod Menu) and stored in
 | GUI Title Check | OFF | Only interact with a GUI whose title exactly matches the expected title |
 | Expected GUI Title | *(empty)* | Title to match when the check is enabled |
 | Keep-Open Button Slot | 35 | Slot clicked to sell in Keep Open mode |
+| Use Allowlist | ON | Only sell items selected in the allowlist; turn off to sell everything |
+| Allowlist | 5 starter items (flowers, pumpkin, melon) | Which item ids may be sold — edit with the fuzzy-search item picker via "Edit Allowlist…" |
 | Check for Updates on Join | ON | Asks GitHub once per server join whether a newer release exists |
 
 **Tip:** with the GUI Title Check disabled, the mod will treat *any* chest-like GUI

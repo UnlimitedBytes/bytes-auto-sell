@@ -6,6 +6,7 @@ import ovh.unlimitedbytes.autosell.config.TransferMethod;
 import me.shedaniel.clothconfig2.api.ConfigBuilder;
 import me.shedaniel.clothconfig2.api.ConfigCategory;
 import me.shedaniel.clothconfig2.api.ConfigEntryBuilder;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
@@ -43,6 +44,18 @@ public final class AutoSellConfigScreen {
 				.setTooltip(Component.translatable("bytesautosell.config.sell_mode.tooltip"))
 				.setSaveConsumer(config::setSellMode)
 				.build());
+		selling.addEntry(entries.startBooleanToggle(Component.translatable("bytesautosell.config.use_allowlist"), config.isUseAllowlist())
+				.setDefaultValue(AutoSellConfig.DEFAULT_USE_ALLOWLIST)
+				.setYesNoTextSupplier(value -> Component.translatable(value ? "bytesautosell.on" : "bytesautosell.off"))
+				.setTooltip(Component.translatable("bytesautosell.config.use_allowlist.tooltip"))
+				.setSaveConsumer(config::setUseAllowlist)
+				.build());
+		selling.addEntry(new OpenAllowlistEntry(
+				Component.translatable("bytesautosell.config.edit_allowlist"),
+				() -> {
+					Screen clothScreen = Minecraft.getInstance().screen;
+					Minecraft.getInstance().setScreenAndShow(AllowlistScreen.create(clothScreen));
+				}));
 		selling.addEntry(entries.startEnumSelector(Component.translatable("bytesautosell.config.transfer_method"), TransferMethod.class, config.getTransferMethod())
 				.setDefaultValue(TransferMethod.SHIFT)
 				.setEnumNameProvider(method -> Component.translatable(((TransferMethod) method).translationKey()))

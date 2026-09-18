@@ -19,6 +19,21 @@
 	"bytesautosell.msg.update_available": "Bytes Auto Sell %s is available - you are running an older version.",
 	"bytesautosell.msg.update_link": "Click here to open the release page.",
 
+	"bytesautosell.config.use_allowlist": "Use Allowlist",
+	"bytesautosell.config.use_allowlist.tooltip": "Only sell the items selected in the allowlist. Turn off to sell everything the sell GUI accepts.",
+	"bytesautosell.config.edit_allowlist": "Edit Allowlist…",
+	"bytesautosell.allowlist.title": "Sell Allowlist",
+	"bytesautosell.allowlist.search": "Search items…",
+	"bytesautosell.allowlist.selected": "Selected: %d",
+	"bytesautosell.allowlist.shown": "%d / %d items",
+	"bytesautosell.allowlist.empty": "No items match your search",
+	"bytesautosell.allowlist.all": "All",
+	"bytesautosell.allowlist.none": "None",
+	"bytesautosell.allowlist.done": "Done",
+	"bytesautosell.allowlist.cancel": "Cancel",
+	"bytesautosell.allowlist.tooltip.on": "Will be sold",
+	"bytesautosell.allowlist.tooltip.off": "Will not be sold",
+
 	"bytesautosell.on": "ON",
 	"bytesautosell.off": "OFF",
 
