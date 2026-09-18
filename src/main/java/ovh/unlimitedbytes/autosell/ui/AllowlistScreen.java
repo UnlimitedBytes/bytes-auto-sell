@@ -225,12 +225,11 @@ public final class AllowlistScreen extends Screen {
 			int boxY = rowY + (ROW_HEIGHT - 10) / 2;
 			if (isSelected) {
 				context.fill(boxX, boxY, boxX + 10, boxY + 10, COLOR_BOX_ON);
-				// pixel-art check: four 2x2 steps, down then up (renders as a
-				// crisp mark at every GUI scale, unlike drawn bars)
-				context.fill(boxX + 2, boxY + 5, boxX + 4, boxY + 7, COLOR_CHECK);
-				context.fill(boxX + 4, boxY + 7, boxX + 6, boxY + 9, COLOR_CHECK);
-				context.fill(boxX + 6, boxY + 5, boxX + 8, boxY + 7, COLOR_CHECK);
-				context.fill(boxX + 8, boxY + 3, boxX + 10, boxY + 5, COLOR_CHECK);
+				// pixel-art check: three 2x2 steps, centered in the box
+				// (bbox x2..8, y3..7 — preview-rendered at GUI scales 1-4)
+				context.fill(boxX + 2, boxY + 3, boxX + 4, boxY + 5, COLOR_CHECK);
+				context.fill(boxX + 4, boxY + 5, boxX + 6, boxY + 7, COLOR_CHECK);
+				context.fill(boxX + 6, boxY + 3, boxX + 8, boxY + 5, COLOR_CHECK);
 			} else {
 				context.fill(boxX, boxY, boxX + 10, boxY + 1, COLOR_BOX_OFF);
 				context.fill(boxX, boxY + 9, boxX + 10, boxY + 10, COLOR_BOX_OFF);
